@@ -1,0 +1,23 @@
+{
+    "name": "haviour",
+    "version-string": "1.0.0",
+    "description": "",
+    "homepage": "",
+    "license": "MIT",
+    "dependencies": [
+        "spdlog",
+        "glfw3",
+        "pugixml",
+        "nativefiledialog",
+        "eventpp",
+        {
+            "name": "imgui",
+            "features": [
+                "docking-experimental",
+                "glfw-binding",
+                "opengl3-binding"
+            ]
+        }
+    ]
+  }
+  
