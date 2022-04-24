@@ -9,6 +9,7 @@ set(headers
 	src/ui/mainwindow.h
 	src/ui/widgets.h
 	src/ui/classes.h
+	src/ui/varlist.h
 	src/ui/propedit.h 
 	src/ui/listview.h
 

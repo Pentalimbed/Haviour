@@ -192,7 +192,7 @@ void ListView::drawTable()
                     PropEdit::getSingleton()->setObject(hkobject);
                 addToolTip("Edit");
                 ImGui::SameLine();
-                ImGui::Button(ICON_FA_MINUS_CIRCLE); // Delete
+                ImGui::Button(ICON_FA_TRASH); // Delete
                 addToolTip("Delete");
                 ImGui::TableNextColumn();
                 copyableText(hkobject.attribute("name").as_string());

@@ -22,6 +22,7 @@ namespace Ui
         ImGui::SetTooltip(__VA_ARGS__);
 
 //////////////    Show Window
+extern bool g_show_var_evt_list;
 extern bool g_show_prop_edit;
 extern bool g_show_list_view;
 extern bool g_show_tree_view;

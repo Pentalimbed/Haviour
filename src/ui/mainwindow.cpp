@@ -2,6 +2,7 @@
 #include "global.h"
 #include "listview.h"
 #include "propedit.h"
+#include "varlist.h"
 #include "hkx/hkxfile.h"
 
 #include <spdlog/spdlog.h>
@@ -17,7 +18,7 @@ void showAboutWindow()
 {
     if (ImGui::Begin("About", &g_show_about))
     {
-        ImGui::TextUnformatted("Haviour ver.x.y.z by Penta-limbed-cat / Five-limbed-cat / 5Cat / ProfJack etc.\nA tool for editing xml-formatted Havok hkx behaviour file.\nCopyleft © 2697BCE Whoever");
+        ImGui::TextUnformatted("Haviour ver.x.y.z by Penta-limbed-cat / Five-limbed-cat / 5Cat / ProfJack etc.\nA tool for editing Bethesda's xml-formatted Havok hkx behaviour file.\nCopyleft © 2697BCE Whoever");
 
         ImGui::Separator();
 
@@ -136,13 +137,13 @@ void showMenuBar()
         {
             if (ImGui::MenuItem("Rebuild Reference List"))
                 Hkx::HkxFile::getSingleton()->rebuildRefList();
-            if (ImGui::MenuItem("Rebuild Variable List"))
-                Hkx::HkxFile::getSingleton()->rebuildVariableList();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))
         {
             ImGui::MenuItem("Property Editor", nullptr, &g_show_prop_edit);
+            ImGui::MenuItem("Variable/Event List", nullptr, &g_show_var_evt_list);
+            ImGui::Separator();
             ImGui::MenuItem("List View", nullptr, &g_show_list_view);
             ImGui::MenuItem("Tree View", nullptr, &g_show_tree_view);
             ImGui::MenuItem("Node View", nullptr, &g_show_node_view);
@@ -182,9 +183,12 @@ void showMainWindow()
     showMenuBar();
     showDockSpace();
 
-    if (g_show_about) showAboutWindow();
-    if (g_show_list_view) ListView::getSingleton()->show();
+    if (g_show_var_evt_list) VarList::getSingleton()->show();
     if (g_show_prop_edit) PropEdit::getSingleton()->show();
+
+    if (g_show_list_view) ListView::getSingleton()->show();
+
+    if (g_show_about) showAboutWindow();
 }
 } // namespace Ui
 

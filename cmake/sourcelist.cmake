@@ -8,6 +8,7 @@ set(sources
 	src/ui/global.cpp
 	src/ui/mainwindow.cpp
 	src/ui/classes.cpp
+	src/ui/varlist.cpp
 	src/ui/propedit.cpp
 	src/ui/listview.cpp
 

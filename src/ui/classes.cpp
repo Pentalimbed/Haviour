@@ -21,13 +21,9 @@ void showEditUi(pugi::xml_node hkobject)
 {
     auto hkclass = hkobject.attribute("class").as_string();
     if (g_class_ui_map.contains(hkclass))
-    {
         g_class_ui_map.at(hkclass)(hkobject);
-    }
     else
-    {
         ImGui::TextDisabled("The class %s is currently not supported.", hkclass);
-    }
 }
 
 void show_hkbBehaviorGraph(pugi::xml_node obj)
@@ -61,20 +57,23 @@ void show_hkbVariableBindingSet(pugi::xml_node obj)
 
         ImGui::TableNextColumn();
 
-        ImGui::Text("Bindings"), ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Bindings"), ImGui::SameLine();
         if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
-        {
-            appendXmlString(bindings, Hkx::g_def_binding);
-            edit_binding = bindings;
-        }
+            if (edit_binding = appendXmlString(bindings, Hkx::g_def_hkbVariableBindingSet_Binding); edit_binding)
+                bindings.attribute("numelements") = bindings.attribute("numelements").as_int() + 1;
         addToolTip("Add new binding");
         ImGui::SameLine();
         if (ImGui::Button(ICON_FA_MINUS_CIRCLE) && edit_binding)
-        {
-            bindings.remove_child(edit_binding);
-            edit_binding = {};
-        }
+            if (bindings.remove_child(edit_binding))
+            {
+                edit_binding                      = {};
+                bindings.attribute("numelements") = bindings.attribute("numelements").as_int() - 1;
+            }
         addToolTip("Remove currently editing binding.");
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(bindings.attribute("numelements").as_string());
 
         if (ImGui::BeginListBox("##refs", ImVec2(-FLT_MIN, -FLT_MIN)))
         {
@@ -95,7 +94,10 @@ void show_hkbVariableBindingSet(pugi::xml_node obj)
             if (ImGui::BeginTable("binding", 2, ImGuiTableFlags_SizingStretchProp))
             {
                 stringEdit(edit_binding.find_child_by_attribute("name", "memberPath"));
-                variableEdit(edit_binding.find_child_by_attribute("name", "variableIndex"));
+                if (!strcmp(edit_binding.find_child_by_attribute("name", "bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) // binding variables
+                    variablePickerEdit(edit_binding.find_child_by_attribute("name", "variableIndex"));
+                else //binding character properties
+                    intEdit(edit_binding.find_child_by_attribute("name", "variableIndex"));
                 intEdit(edit_binding.find_child_by_attribute("name", "bitIndex"));
                 enumEdit(edit_binding.find_child_by_attribute("name", "bindingType"), Hkx::e_bindingType);
                 ImGui::EndTable();
