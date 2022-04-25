@@ -12,6 +12,7 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
 find_package(unofficial-nativefiledialog CONFIG REQUIRED)
 find_package(eventpp CONFIG REQUIRED)
+find_package(robin_hood CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
@@ -28,6 +29,7 @@ target_link_libraries(
         pugixml::pugixml
         unofficial::nativefiledialog::nfd
         eventpp::eventpp
+        robin_hood::robin_hood
         ${OPENGL_LIBRARIES}
         glfw
         imgui::imgui

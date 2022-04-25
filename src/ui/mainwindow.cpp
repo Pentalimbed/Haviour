@@ -1,9 +1,6 @@
 #include "mainwindow.h"
-#include "global.h"
-#include "listview.h"
-#include "propedit.h"
-#include "varlist.h"
 #include "hkx/hkxfile.h"
+#include "varedit.h"
 
 #include <spdlog/spdlog.h>
 #include <nfd.h>
@@ -14,9 +11,11 @@ namespace Haviour
 {
 namespace Ui
 {
+bool g_show_about = false;
+
 void showAboutWindow()
 {
-    if (ImGui::Begin("About", &g_show_about))
+    if (ImGui::Begin("About", &g_show_about, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar))
     {
         ImGui::TextUnformatted("Haviour ver.x.y.z by Penta-limbed-cat / Five-limbed-cat / 5Cat / ProfJack etc.\nA tool for editing Bethesda's xml-formatted Havok hkx behaviour file.\nCopyleft © 2697BCE Whoever");
 
@@ -76,6 +75,15 @@ void showAboutWindow()
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::TableNextColumn();
+            ImGui::Text("robin_hood unordered map & set");
+            ImGui::TableNextColumn();
+            ImGui::Text("by");
+            ImGui::TableNextColumn();
+            ImGui::Text("Martin Ankerl");
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TableNextColumn();
             ImGui::Text("pugixml");
             ImGui::TableNextColumn();
             ImGui::Text("by");
@@ -85,11 +93,20 @@ void showAboutWindow()
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::TableNextColumn();
-            ImGui::Text("nativefiledialog");
+            ImGui::Text("Native File Dialog");
             ImGui::TableNextColumn();
             ImGui::Text("by");
             ImGui::TableNextColumn();
             ImGui::Text("Michael Labbe");
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TableNextColumn();
+            ImGui::Text("eventpp");
+            ImGui::TableNextColumn();
+            ImGui::Text("by");
+            ImGui::TableNextColumn();
+            ImGui::Text("Wang Qi");
 
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -106,47 +123,96 @@ void showAboutWindow()
     }
 }
 
+bool shortcut(ImGuiKeyModFlags mod, ImGuiKey key, bool repeat = true)
+{
+    return (mod == ImGui::GetIO().KeyMods) && ImGui::IsKeyPressed(key, repeat);
+}
+
+void openFile()
+{
+    auto        file_manager = Hkx::HkxFileManager::getSingleton();
+    nfdchar_t*  outPath      = nullptr;
+    nfdresult_t result       = NFD_OpenDialog(nullptr, nullptr, &outPath);
+    if (result == NFD_OKAY)
+    {
+        file_manager->newFile(outPath);
+        free(outPath);
+    }
+    else if (result == NFD_ERROR)
+    {
+        spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
+    }
+}
+
+void saveFileAs()
+{
+    auto        file_manager = Hkx::HkxFileManager::getSingleton();
+    nfdchar_t*  outPath      = nullptr;
+    nfdresult_t result       = NFD_SaveDialog(nullptr, nullptr, &outPath);
+    if (result == NFD_OKAY)
+    {
+        file_manager->saveFile(outPath);
+        free(outPath);
+    }
+    else if (result == NFD_ERROR)
+    {
+        spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
+    }
+}
+
 void showMenuBar()
 {
+    auto file_manager = Hkx::HkxFileManager::getSingleton();
+
+    if (shortcut(ImGuiKeyModFlags_Ctrl, ImGuiKey_O)) openFile();
+    if (shortcut(ImGuiKeyModFlags_Ctrl, ImGuiKey_S)) file_manager->saveFile();
+    if (shortcut(ImGuiKeyModFlags_Ctrl, ImGuiKey_F4)) file_manager->closeCurrentFile();
+
     if (ImGui::BeginMainMenuBar())
     {
         if (ImGui::BeginMenu("File"))
         {
+            bool dummy_selected = false;
+            if (ImGui::MenuItem("New", "CTRL+N")) {}
             if (ImGui::MenuItem("Open", "CTRL+O"))
-            {
-                nfdchar_t*  outPath = nullptr;
-                nfdresult_t result  = NFD_OpenDialog(nullptr, nullptr, &outPath);
-                if (result == NFD_OKAY)
-                {
-                    spdlog::info("Opening file: {}", outPath);
-                    Hkx::HkxFile::getSingleton()->loadFile(outPath);
-                    free(outPath);
-                }
-                else if (result == NFD_ERROR)
-                {
-                    spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
-                }
-            }
-            if (ImGui::MenuItem("Save", "CTRL+S")) {}
-            if (ImGui::MenuItem("Save As"))
-            {
-            }
+                openFile();
+            if (ImGui::MenuItem("Save", "CTRL+S", &dummy_selected, file_manager->isFileSelected()))
+                file_manager->saveFile();
+            if (ImGui::MenuItem("Save As", nullptr, &dummy_selected, file_manager->isFileSelected()))
+                saveFileAs();
+
+            ImGui::Separator();
+
+            auto path_list = file_manager->getPathList();
+            if (path_list.empty())
+                ImGui::TextDisabled("No file loaded");
+            else
+                for (int i = 0; i < path_list.size(); ++i)
+                    if (ImGui::MenuItem(path_list[i].data(), nullptr, i == file_manager->getCurrentFileIdx()))
+                        file_manager->setCurrentFile(i);
+
+            ImGui::Separator();
+            if (ImGui::MenuItem("Close", "Ctrl+F4"))
+                file_manager->closeCurrentFile();
+            if (ImGui::MenuItem("Close All"))
+                file_manager->closeAllFiles();
+
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Rebuild Reference List"))
-                Hkx::HkxFile::getSingleton()->rebuildRefList();
+            if (ImGui::MenuItem("Build Reference List") && file_manager->isFileSelected())
+                file_manager->getCurrentFile().buildRefList();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))
         {
-            ImGui::MenuItem("Property Editor", nullptr, &g_show_prop_edit);
-            ImGui::MenuItem("Variable/Event List", nullptr, &g_show_var_evt_list);
-            ImGui::Separator();
-            ImGui::MenuItem("List View", nullptr, &g_show_list_view);
-            ImGui::MenuItem("Tree View", nullptr, &g_show_tree_view);
-            ImGui::MenuItem("Node View", nullptr, &g_show_node_view);
+            // ImGui::MenuItem("Property Editor", nullptr, &g_show_prop_edit);
+            ImGui::MenuItem("Variable/Event List", nullptr, &VarEdit::getSingleton()->m_show);
+            // ImGui::Separator();
+            // ImGui::MenuItem("List View", nullptr, &g_show_list_view);
+            // ImGui::MenuItem("Tree View", nullptr, &g_show_tree_view);
+            // ImGui::MenuItem("Node View", nullptr, &g_show_node_view);
             ImGui::Separator();
             ImGui::MenuItem("About", nullptr, &g_show_about);
             ImGui::EndMenu();
@@ -183,10 +249,10 @@ void showMainWindow()
     showMenuBar();
     showDockSpace();
 
-    if (g_show_var_evt_list) VarList::getSingleton()->show();
-    if (g_show_prop_edit) PropEdit::getSingleton()->show();
+    if (VarEdit::getSingleton()->m_show) VarEdit::getSingleton()->show();
+    // if (g_show_prop_edit) PropEdit::getSingleton()->show();
 
-    if (g_show_list_view) ListView::getSingleton()->show();
+    // if (g_show_list_view) ListView::getSingleton()->show();
 
     if (g_show_about) showAboutWindow();
 }

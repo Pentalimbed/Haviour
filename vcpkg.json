@@ -9,6 +9,7 @@
         "glfw3",
         "pugixml",
         "nativefiledialog",
+        "robin-hood-hashing",
         "eventpp",
         {
             "name": "imgui",

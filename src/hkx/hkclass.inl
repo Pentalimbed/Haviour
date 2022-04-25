@@ -1,45 +1,17 @@
 #pragma once
+#include "utils.h"
 
+#include <string>
 #include <array>
-#include <string_view>
 #include <map>
 
 #include <pugixml.hpp>
 
 namespace Haviour
 {
-//////////////////////////    XML Helpers
-inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view srcString)
-{
-    // parse XML string as document
-    pugi::xml_document doc;
-    if (!doc.load_buffer(srcString.data(), srcString.length()))
-        return {};
-
-    target.attribute("numelements") = target.attribute("numelements").as_uint() + 1;
-    return target.append_copy(doc.first_child());
-}
-
-inline pugi::xml_node getNthChild(pugi::xml_node target, uint32_t n)
-{
-    auto node = target.first_child();
-    while (node && (n > 1))
-        node = node.next_sibling();
-    return node;
-}
-
 namespace Hkx
 {
-
-struct EnumWrapper
-{
-    std::string_view name;
-    uint32_t         val;
-    std::string_view hint = {};
-};
-
 //////////////////////////    ENUMS & FLAGS
-
 // hkbVariableInfo
 enum VariableTypeEnum : int8_t
 {
@@ -67,13 +39,6 @@ constexpr auto e_variableType = std::to_array<std::string_view>(
         "VARIABLE_TYPE_VECTOR4",
         "VARIABLE_TYPE_QUATERNION",
     });
-enum VariableSizeEnum
-{
-    kVarSizeInvalid,
-    kVarSizeWord,
-    kVarSizeVariant,
-    kVarSizeQuad
-};
 constexpr VariableTypeEnum getVarTypeEnum(std::string_view enumstr)
 {
     int i = 0;
@@ -149,18 +114,7 @@ constexpr const char* g_def_hkbVariableInfo =
             <hkparam name="flags">0</hkparam>
         </hkobject>
     </hkparam>
-    <hkparam name="type">{}</hkparam>
-</hkobject>)"; // This one needs formatting
-
-constexpr const char* g_def_hkbVariableInfo_characterPropertyInfo =
-    R"(<hkobject>
-    <hkparam name="role">
-        <hkobject>
-            <hkparam name="role">ROLE_DEFAULT</hkparam>
-            <hkparam name="flags">FLAG_OUTPUT|FLAG_HIDDEN|FLAG_NOT_VARIABLE|FLAG_NONE</hkparam>
-        </hkobject>
-    </hkparam>
-    <hkparam name="type">VARIABLE_TYPE_POINTER</hkparam>
+    <hkparam name="type">VARIABLE_TYPE_NONE</hkparam>
 </hkobject>)";
 
 constexpr const char* g_def_hkbVariableValue =
@@ -195,7 +149,5 @@ inline const std::map<std::string_view, const char*>& getClassDefaultMap()
         MAPITEM(hkbVariableInfo)};
     return map;
 }
-
 } // namespace Hkx
-
 } // namespace Haviour

@@ -8,6 +8,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include "logger.h"
+#include "hkx/hkxfile.h"
 #include "ui/mainwindow.h"
 
 namespace Haviour
@@ -168,6 +169,13 @@ int initApp()
     ImGui_ImplGlfw_InitForOpenGL(g_window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    Hkx::HkxFileManager::getSingleton()->appendListener(Hkx::kEventFileChanged, [=]() {
+        auto file_manager = Hkx::HkxFileManager::getSingleton();
+        if (file_manager->isFileSelected())
+            glfwSetWindowTitle(g_window, fmt::format("{} [{}]", g_window_title, file_manager->getCurrentFile().getPath()).c_str());
+        else
+            glfwSetWindowTitle(g_window, g_window_title);
+    });
     spdlog::info("App initialization complete!");
     return 0;
 }
