@@ -16,9 +16,7 @@ namespace Hkx
 enum HkxFileEventEnum
 {
     kEventFileChanged,
-    kEventAddObj,
-    kEventDelObj,
-    kEventTidyUp
+    kEventObjChanged
 };
 
 // Single file
@@ -30,22 +28,50 @@ public:
     inline bool             isFileLoaded() { return m_loaded; }
     inline std::string_view getPath() { return m_path; }
 
-    void addRef(std::string_view id, std::string_view parent_id);
-    void deRef(std::string_view id, std::string_view parent_id);
+    void        addRef(std::string_view id, std::string_view parent_id);
+    void        deRef(std::string_view id, std::string_view parent_id);
+    inline bool hasRef(std::string_view id) { return !(m_obj_ref_list.contains(id) && m_obj_ref_list.find(id)->second.empty()); }
+    inline void getObjRefs(std::string_view id, std::vector<std::string>& out)
+    {
+        if (m_obj_ref_list.contains(id))
+            for (auto& id : m_obj_ref_list.find(id)->second)
+                out.push_back(id);
+    }
     void buildRefList();
 
-    inline pugi::xml_node getNode(std::string_view id)
+    inline pugi::xml_node getObj(std::string_view id)
     {
         if (m_obj_list.contains(id))
             return m_obj_list.find(id)->second; // until c++23 transparent searching for [] is implemented
         return {};
     }
+    inline void getObjList(std::vector<std::string>& out)
+    {
+        for (auto& pair : m_obj_list)
+            out.push_back(pair.first);
+    }
+    inline void getObjListByClass(std::string_view hkclass, std::vector<std::string>& out)
+    {
+        if (m_obj_class_list.contains(hkclass))
+            for (auto& id : m_obj_class_list.find(hkclass)->second)
+                out.push_back(id);
+    }
+    inline void getClasses(std::vector<std::string>& out)
+    {
+        out.push_back("All");
+        for (auto& pair : m_obj_class_list)
+            out.push_back(pair.first);
+        std::ranges::sort(out);
+    }
 
     inline bool isObjEssential(std::string_view id)
     {
         auto essential_obj = {m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj};
-        return std::ranges::find(essential_obj, getNode(id)) != essential_obj.end();
+        return std::ranges::find(essential_obj, getObj(id)) != essential_obj.end();
     }
+
+    std::string_view addObj(std::string_view hkclass);
+    void             delObj(std::string_view id);
 
 
     AnimationEventManager    m_evt_manager;
@@ -75,9 +101,9 @@ private:
 
     uint16_t m_latest_id = 0;
 
-    StringMap<pugi::xml_node>                              m_obj_list;
-    StringMap<std::vector<std::string_view>>               m_obj_class_list;
-    StringMap<robin_hood::unordered_set<std::string_view>> m_ref_list;
+    StringMap<pugi::xml_node>           m_obj_list;
+    StringMap<std::vector<std::string>> m_obj_class_list;
+    StringMap<StringSet>                m_obj_ref_list;
 };
 
 // Managing files

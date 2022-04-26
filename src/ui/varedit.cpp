@@ -98,20 +98,18 @@ void VarEdit::showVarList()
     addTooltip("Reindex variables\nDiscard all variables marked obsolete");
 
     ImGui::InputText("Filter", &m_var_filter), ImGui::SameLine();
-    if (ImGui::BeginPopup("Color scheme"))
+    ImGui::Button(ICON_FA_QUESTION_CIRCLE);
+    if (ImGui::IsItemHovered())
     {
+        ImGui::BeginTooltip();
         ImGui::TextColored(color_invalid, "Invalid");
         ImGui::TextColored(color_bool, "Boolean");
         ImGui::TextColored(color_int, "Int8/16/32");
         ImGui::TextColored(color_float, "Real");
         ImGui::TextColored(color_attr, "Pointer");
         ImGui::TextColored(color_quad, "Vector/Quaternion");
-        ImGui::EndPopup();
+        ImGui::EndTooltip();
     }
-    if (ImGui::Button(ICON_FA_QUESTION_CIRCLE))
-        ImGui::OpenPopup("Color scheme");
-    addTooltip("Coloring");
-
     ImGui::Separator();
 
     if (ImGui::BeginTable("##VarList", 2, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
@@ -121,23 +119,20 @@ void VarEdit::showVarList()
         ImGui::TableNextRow();
 
         auto var_list = current_file.m_var_manager.getEntryList();
-
-        std::vector<Hkx::Variable> var_filtered;
-        var_filtered.reserve(var_list.size());
-        std::ranges::copy_if(var_list, std::back_inserter(var_filtered),
-                             [=](auto& var) {
-                                 auto var_disp_name = std::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string()); // :3
-                                 return var.m_valid &&
-                                     (m_var_filter.empty() ||
-                                      !std::ranges::search(var_disp_name, m_var_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty());
-                             });
+        std::erase_if(var_list,
+                      [=](auto& var) {
+                          auto var_disp_name = std::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string()); // :3
+                          return !(var.m_valid &&
+                                   (m_var_filter.empty() ||
+                                    !std::ranges::search(var_disp_name, m_var_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                      });
 
         ImGuiListClipper clipper;
-        clipper.Begin(var_filtered.size());
+        clipper.Begin(var_list.size());
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                auto& var = var_filtered[row_n];
+                auto& var = var_list[row_n];
 
                 ImGui::TableNextColumn();
 
@@ -220,22 +215,20 @@ void VarEdit::showEvtList()
 
         auto evt_list = current_file.m_evt_manager.getEntryList();
 
-        std::vector<Hkx::AnimationEvent> evt_filtered;
-        evt_filtered.reserve(evt_list.size());
-        std::ranges::copy_if(evt_list, std::back_inserter(evt_filtered),
-                             [=](auto& evt) {
-                                 auto disp_name = std::format("{:3} {}", evt.m_index, evt.get<Hkx::PropName>().text().as_string()); // :3
-                                 return evt.m_valid &&
-                                     (m_evt_filter.empty() ||
-                                      !std::ranges::search(disp_name, m_evt_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty());
-                             });
+        std::erase_if(evt_list,
+                      [=](auto& evt) {
+                          auto disp_name = std::format("{:3} {}", evt.m_index, evt.get<Hkx::PropName>().text().as_string()); // :3
+                          return !(evt.m_valid &&
+                                   (m_evt_filter.empty() ||
+                                    !std::ranges::search(disp_name, m_evt_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                      });
 
         ImGuiListClipper clipper;
-        clipper.Begin(evt_filtered.size());
+        clipper.Begin(evt_list.size());
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                auto& evt = evt_filtered[row_n];
+                auto& evt = evt_list[row_n];
 
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", evt.m_index);
@@ -301,23 +294,21 @@ void VarEdit::showPropList()
         ImGui::TableNextRow();
 
         auto prop_list = current_file.m_prop_manager.getEntryList();
-
-        std::vector<Hkx::CharacterProperty> prop_filtered;
-        prop_filtered.reserve(prop_list.size());
-        std::ranges::copy_if(prop_list, std::back_inserter(prop_filtered),
-                             [=](auto& prop) {
-                                 auto disp_name = std::format("{:3} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string()); // :3
-                                 return prop.m_valid &&
-                                     (m_prop_filter.empty() ||
-                                      !std::ranges::search(disp_name, m_prop_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty());
-                             });
+        std::erase_if(
+            prop_list,
+            [=](auto& prop) {
+                auto disp_name = std::format("{:3} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string()); // :3
+                return !(prop.m_valid &&
+                         (m_prop_filter.empty() ||
+                          !std::ranges::search(disp_name, m_prop_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+            });
 
         ImGuiListClipper clipper;
-        clipper.Begin(prop_filtered.size());
+        clipper.Begin(prop_list.size());
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                auto& prop = prop_filtered[row_n];
+                auto& prop = prop_list[row_n];
 
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", prop.m_index);

@@ -1,5 +1,6 @@
 #include "widgets.h"
 #include "hkx/hkclass.inl"
+#include "propedit.h"
 
 #include <imgui.h>
 #include <spdlog/spdlog.h>
@@ -31,22 +32,21 @@ bool variablePickerPopup(const char* str_id, Hkx::VariableManager& var_manager, 
         ImGui::InputText("Filter", &search_text);
         ImGui::Separator();
 
-        std::vector<Hkx::Variable> var_filtered;
-        var_filtered.reserve(var_list_cache.size());
-        std::ranges::copy_if(var_list_cache, std::back_inserter(var_filtered),
-                             [](auto& var) {
-                                 auto var_disp_name = fmt::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string());
-                                 return var.m_valid &&
-                                     (search_text.empty() ||
-                                      !std::ranges::search(var_disp_name, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty());
-                             });
+        auto var_list = var_manager.getEntryList();
+        std::erase_if(var_list,
+                      [=](auto& var) {
+                          auto var_disp_name = std::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string()); // :3
+                          return !(var.m_valid &&
+                                   (search_text.empty() ||
+                                    !std::ranges::search(var_disp_name, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                      });
 
         ImGuiListClipper clipper;
-        clipper.Begin(var_filtered.size());
+        clipper.Begin(var_list.size());
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                auto& var = var_filtered[row_n];
+                auto& var = var_list[row_n];
 
                 if (var.m_valid)
                 {
@@ -69,134 +69,172 @@ bool variablePickerPopup(const char* str_id, Hkx::VariableManager& var_manager, 
     return false;
 }
 
-template <size_t N>
-void flagPopup(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
+bool eventPickerPopup(const char*                 str_id,
+                      Hkx::AnimationEventManager& evt_manager,
+                      Hkx::AnimationEvent&        out)
 {
-    std::string value_text = hkparam.text().as_string();
-    uint32_t    value      = 0;
+    static std::vector<Hkx::AnimationEvent> evt_list_cache;
+    static bool                             need_update = true;
+    static std::string                      search_text;
+
+    if (need_update)
+    {
+        need_update    = false;
+        search_text    = {};
+        evt_list_cache = evt_manager.getEntryList();
+    }
+
     if (ImGui::BeginPopup(str_id))
     {
-        bool value_changed = false;
-        for (EnumWrapper flag : flags)
-        {
-            if (flag.val && value_text.contains(flag.name))
-                value |= flag.val;
-        }
-        for (EnumWrapper flag : flags)
-            if (flag.val)
+        ImGui::InputText("Filter", &search_text);
+        ImGui::Separator();
+
+        auto evt_list = evt_manager.getEntryList();
+        std::erase_if(evt_list,
+                      [=](auto& evt) {
+                          auto disp_name = std::format("{:3} {}", evt.m_index, evt.get<Hkx::PropName>().text().as_string()); // :3
+                          return !(evt.m_valid &&
+                                   (search_text.empty() ||
+                                    !std::ranges::search(disp_name, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                      });
+
+        ImGuiListClipper clipper;
+        clipper.Begin(evt_list.size());
+        while (clipper.Step())
+            for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                if (ImGui::CheckboxFlags(flag.name.data(), &value, flag.val))
-                    value_changed = true;
-                if (!flag.hint.empty())
-                    addTooltip(flag.hint.data());
+                auto& var = evt_list[row_n];
+
+                if (var.m_valid)
+                {
+                    auto var_disp_name = fmt::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string());
+                    if (ImGui::Selectable(var_disp_name.c_str()))
+                    {
+                        ImGui::CloseCurrentPopup();
+                        out = var;
+                        ImGui::EndPopup();
+                        return true;
+                    }
+                }
             }
-        if (value_changed)
-        {
-            value_text = {};
-            if (!value) value_text = "0";
-            else
-            {
-                for (EnumWrapper flag : flags)
-                    if (value & flag.val)
-                        value_text.append(fmt::format("{}|", flag.name));
-                if (value_text.ends_with('|'))
-                    value_text.pop_back();
-            }
-            hkparam.text() = value_text.c_str();
-        }
+
         ImGui::EndPopup();
     }
-}
-template <size_t N>
-void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
-{
-    flagPopup(str_id, hkparam, flags);
-    if (ImGui::Button(ICON_FA_FLAG))
-        ImGui::OpenPopup(str_id);
-    addTooltip("Edit individual flags");
+    else
+        need_update = true;
+
+    return false;
 }
 
 ////////////////    EDITS
 
-void stringEdit(pugi::xml_node hkparam, std::string_view manual_name)
+void stringEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     std::string value = hkparam.text().as_string();
     if (ImGui::InputText(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
         hkparam.text() = value.c_str();
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-void boolEdit(pugi::xml_node hkparam, std::string_view manual_name)
+void boolEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     bool value = hkparam.text().as_bool();
     if (ImGui::Checkbox(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
         hkparam.text() = value;
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-template <size_t N>
-void enumEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& enums, std::string_view manual_name)
+void intScalarEdit(pugi::xml_node hkparam, ImGuiDataType data_type, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
-    std::string value = hkparam.text().as_string();
-    if (ImGui::BeginCombo(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), value.c_str()))
+    union
     {
-        for (EnumWrapper enum_wrapper : enums)
-        {
-            const bool is_selected = value == enum_wrapper.name;
-            if (ImGui::Selectable(enum_wrapper.name.data(), is_selected))
-                hkparam.text().set(enum_wrapper.name.data());
-            if (!enum_wrapper.hint.empty())
-                addTooltip(enum_wrapper.hint.data());
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
+        uint8_t  u8;
+        uint16_t u16;
+        uint32_t u32;
+        uint64_t u64;
+        int8_t   s8;
+        int16_t  s16;
+        int32_t  s32;
+        int64_t  s64;
+    } value;
+
+    switch (data_type)
+    {
+        case ImGuiDataType_U8:
+            value.u8 = hkparam.text().as_uint();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.u8))
+                hkparam.text() = value.u8;
+            break;
+        case ImGuiDataType_U16:
+            value.u16 = hkparam.text().as_uint();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.u16))
+                hkparam.text() = value.u16;
+            break;
+        case ImGuiDataType_U32:
+            value.u32 = hkparam.text().as_uint();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.u32))
+                hkparam.text() = value.u32;
+            break;
+        case ImGuiDataType_U64:
+            value.u64 = hkparam.text().as_ullong();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.u64))
+                hkparam.text() = value.u64;
+        case ImGuiDataType_S8:
+            value.s8 = hkparam.text().as_int();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.s8))
+                hkparam.text() = value.s8;
+            break;
+        case ImGuiDataType_S16:
+            value.s16 = hkparam.text().as_int();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.s16))
+                hkparam.text() = value.s16;
+            break;
+        case ImGuiDataType_S32:
+            value.s32 = hkparam.text().as_int();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.s32))
+                hkparam.text() = value.s32;
+            break;
+        case ImGuiDataType_S64:
+            value.s64 = hkparam.text().as_llong();
+            if (ImGui::InputScalar(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), data_type, &value.s64))
+                hkparam.text() = value.s64;
+            break;
+        default:
+            ImGui::TableNextColumn();
+            return;
+            break;
     }
-
+    if (!hint.empty())
+        addTooltip(hint.data());
     ImGui::TableNextColumn();
 }
 
-void intEdit(pugi::xml_node hkparam, std::string_view manual_name)
-{
-    ImGui::TableNextColumn();
-    auto value = hkparam.text().as_int();
-    if (ImGui::InputInt(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
-        hkparam.text() = value;
-
-    ImGui::TableNextColumn();
-}
-
-void sliderIntEdit(pugi::xml_node hkparam, int lb, int ub, std::string_view manual_name)
+void sliderIntEdit(pugi::xml_node hkparam, int lb, int ub, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     int value = hkparam.text().as_int();
     if (ImGui::SliderInt(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value, lb, ub, "%.6f"))
         hkparam.text() = value;
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-template <size_t N>
-void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view manual_name)
+void variablePickerEdit(pugi::xml_node hkparam, Hkx::VariableManager& var_manager, std::string_view hint, std::string_view manual_name)
 {
     ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
 
-    stringEdit(hkparam, manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-    flagEditButton("Edit flags", hkparam, flags);
-
-    ImGui::PopID();
-}
-
-void variablePickerEdit(pugi::xml_node hkparam, Hkx::VariableManager& var_manager, std::string_view manual_name)
-{
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
-    intEdit(hkparam, manual_name);
+    intScalarEdit(hkparam, ImGuiDataType_S32, hint, manual_name);
 
     Hkx::Variable out_var;
     if (variablePickerPopup("Pickvar", var_manager, out_var))
@@ -208,39 +246,64 @@ void variablePickerEdit(pugi::xml_node hkparam, Hkx::VariableManager& var_manage
     ImGui::PopID();
 }
 
-void sliderFloatEdit(pugi::xml_node hkparam, float lb, float ub, std::string_view manual_name)
+void eventPickerEdit(pugi::xml_node              hkparam,
+                     Hkx::AnimationEventManager& evt_manager,
+                     std::string_view            hint,
+                     std::string_view            manual_name)
+{
+    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
+
+    intScalarEdit(hkparam, ImGuiDataType_S32, hint, manual_name);
+
+    Hkx::AnimationEvent out_evt;
+    if (eventPickerPopup("Pickevt", evt_manager, out_evt))
+        hkparam.text() = out_evt.m_index;
+    if (ImGui::Button(ICON_FA_SEARCH))
+        ImGui::OpenPopup("Pickevt");
+    addTooltip("Select event");
+
+    ImGui::PopID();
+}
+
+void sliderFloatEdit(pugi::xml_node hkparam, float lb, float ub, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     float value = hkparam.text().as_float();
     if (ImGui::SliderFloat(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value, lb, ub, "%.6f"))
         hkparam.text() = fmt::format("{:.6f}", value).c_str();
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-void floatEdit(pugi::xml_node hkparam, std::string_view manual_name)
+void floatEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     float value = hkparam.text().as_float();
     if (ImGui::InputFloat(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value, 0.0f, 0.0f, "%.6f"))
         hkparam.text() = fmt::format("{:.6f}", value).c_str();
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
 // for floats written in UINT32 values
-void convertFloatEdit(pugi::xml_node hkparam, std::string_view manual_name)
+void convertFloatEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     auto  raw_value = hkparam.text().as_uint();
     float value     = *reinterpret_cast<float*>(&raw_value);
     if (ImGui::InputFloat(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value, 0.0f, 0.0f))
         hkparam.text() = *reinterpret_cast<uint32_t*>(&value);
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-void quadEdit(pugi::xml_node hkparam, std::string_view manual_name)
+void quadEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
 
@@ -252,11 +315,13 @@ void quadEdit(pugi::xml_node hkparam, std::string_view manual_name)
 
     if (ImGui::InputFloat4(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), value, "%.6f"))
         hkparam.text() = fmt::format("({:.6f} {:.6f} {:.6f} {:.6f})", value[0], value[1], value[2], value[3]).c_str();
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
 }
 
-void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classes, Hkx::HkxFile& file, std::string_view manual_name)
+void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classes, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
 
@@ -269,7 +334,7 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
     if (ImGui::InputText(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
     {
         edited = true;
-        if (auto obj = file.getNode(value))                                                                        // Is obj
+        if (auto obj = file.getObj(value))                                                                         // Is obj
             if (std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) != classes.end()) // Same class
                 hkparam.text() = value.c_str();
             else
@@ -277,13 +342,12 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
         else
             hkparam.text() = "null";
     }
+    if (!hint.empty())
+        addTooltip(hint.data());
 
     ImGui::TableNextColumn();
-    // copyButton(hkparam.text().as_string());
-
-    // ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_ARROW_CIRCLE_RIGHT)) {}
-    // PropEdit::getSingleton()->setObject(value);
+    if (ImGui::Button(ICON_FA_ARROW_CIRCLE_RIGHT))
+        PropEdit::getSingleton()->setObject(value);
     addTooltip("Go to");
 
     ImGui::SameLine();
@@ -314,6 +378,63 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
     ImGui::PopID();
 }
 
+void refEdit(std::string&                         value,
+             const std::vector<std::string_view>& classes,
+             pugi::xml_node                       parent,
+             Hkx::HkxFile&                        file,
+             std::string_view                     hint,
+             std::string_view                     manual_name)
+{
+    ImGui::TableNextColumn();
+
+    ImGui::PushID(manual_name.data());
+
+    bool        edited    = false;
+    std::string old_value = value;
+
+    if (ImGui::InputText(manual_name.data(), &value))
+    {
+        edited = true;
+        if (auto obj = file.getObj(value))                                                                         // Is obj
+            if (std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) == classes.end()) // Different class
+                value = "null";
+            else
+                value = "null";
+    }
+    if (!hint.empty())
+        addTooltip(hint.data());
+
+    ImGui::TableNextColumn();
+    if (ImGui::Button(ICON_FA_ARROW_CIRCLE_RIGHT))
+        PropEdit::getSingleton()->setObject(value);
+    addTooltip("Go to");
+
+    ImGui::SameLine();
+    if (ImGui::BeginPopup("Append"))
+    {
+        for (auto class_name : classes)
+            if (ImGui::Selectable(class_name.data()))
+            {
+                // TODO add item
+                ImGui::CloseCurrentPopup();
+            }
+        ImGui::EndPopup();
+    }
+    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+        ImGui::OpenPopup("Append");
+    addTooltip("Append");
+
+    if (edited)
+    {
+        auto parent_id = parent.attribute("name").as_string();
+        if (!isRefBy(old_value, parent))
+            file.deRef(old_value, parent_id);
+        file.addRef(value, parent_id);
+    }
+
+    ImGui::PopID();
+}
+
 ////////////////    Linked Prop Edits
 
 void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
@@ -322,7 +443,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
     {
         if (ImGui::BeginTable("varedit", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(600, -FLT_MIN)))
         {
-            stringEdit(var.get<Hkx::PropName>(), "name");
+            stringEdit(var.get<Hkx::PropName>(), "", "name");
             if (ImGui::Button(ICON_FA_TRASH))
             {
                 auto name     = var.get<Hkx::PropName>().text().as_string();
@@ -352,13 +473,13 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
                     boolEdit(var_value_node);
                     break;
                 case Hkx::VARIABLE_TYPE_INT8:
-                    sliderIntEdit(var_value_node, INT8_MIN, INT8_MAX);
+                    intScalarEdit(var_value_node, ImGuiDataType_S8);
                     break;
                 case Hkx::VARIABLE_TYPE_INT16:
-                    sliderIntEdit(var_value_node, INT16_MIN, INT16_MAX);
+                    intScalarEdit(var_value_node, ImGuiDataType_S16);
                     break;
                 case Hkx::VARIABLE_TYPE_INT32:
-                    intEdit(var_value_node);
+                    intScalarEdit(var_value_node, ImGuiDataType_S32);
                     break;
                 case Hkx::VARIABLE_TYPE_REAL:
                     convertFloatEdit(var_value_node);
@@ -402,12 +523,11 @@ void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::HkxFile& fi
     {
         if (ImGui::BeginTable("eventedit", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(300.0, 0.0)))
         {
-            stringEdit(evt.get<Hkx::PropName>(), "name");
+            stringEdit(evt.get<Hkx::PropName>(), "", "name");
             if (ImGui::Button(ICON_FA_TRASH))
             {
-                auto& file     = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
-                auto  name     = evt.get<Hkx::PropName>().text().as_string();
-                auto  ref_node = file.getFirstEventRef(evt.m_index);
+                auto name     = evt.get<Hkx::PropName>().text().as_string();
+                auto ref_node = file.getFirstEventRef(evt.m_index);
                 if (ref_node)
                 {
                     spdlog::warn("This event is still referenced by {} and potentially more object.\nID copied to clipboard.", ref_node.attribute("name").as_string());
@@ -417,8 +537,9 @@ void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::HkxFile& fi
                 {
                     file.m_evt_manager.delEntry(evt.m_index);
                     spdlog::info("Event {} deleted!", name);
-                    ImGui::CloseCurrentPopup();
                     ImGui::EndTable();
+                    ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
                     return;
                 }
             }
@@ -438,12 +559,11 @@ void propEditPopup(const char* str_id, Hkx::CharacterProperty& prop, Hkx::HkxFil
     {
         if (ImGui::BeginTable("eventedit", 2, ImGuiTableFlags_SizingStretchProp, ImVec2(300.0, 0.0)))
         {
-            stringEdit(prop.get<Hkx::PropName>(), "name");
+            stringEdit(prop.get<Hkx::PropName>(), "", "name");
             if (ImGui::Button(ICON_FA_TRASH))
             {
-                auto& file     = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
-                auto  name     = prop.get<Hkx::PropName>().text().as_string();
-                auto  ref_node = file.getFirstEventRef(prop.m_index);
+                auto name     = prop.get<Hkx::PropName>().text().as_string();
+                auto ref_node = file.getFirstEventRef(prop.m_index);
                 if (ref_node)
                 {
                     spdlog::warn("This property is still referenced by {} and potentially more object.\nID copied to clipboard.", ref_node.attribute("name").as_string());
@@ -453,8 +573,9 @@ void propEditPopup(const char* str_id, Hkx::CharacterProperty& prop, Hkx::HkxFil
                 {
                     file.m_evt_manager.delEntry(prop.m_index);
                     spdlog::info("Event {} deleted!", name);
-                    ImGui::CloseCurrentPopup();
                     ImGui::EndTable();
+                    ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
                     return;
                 }
             }

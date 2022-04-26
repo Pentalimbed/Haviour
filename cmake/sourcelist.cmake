@@ -11,4 +11,7 @@ set(sources
 	src/ui/mainwindow.cpp
 	src/ui/widgets.cpp
 	src/ui/varedit.cpp
+	src/ui/listview.cpp
+	src/ui/classinterface.cpp
+	src/ui/propedit.cpp
 )

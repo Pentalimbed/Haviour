@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 #include "hkx/hkxfile.h"
 #include "varedit.h"
+#include "listview.h"
+#include "propedit.h"
 
 #include <spdlog/spdlog.h>
 #include <nfd.h>
@@ -207,10 +209,10 @@ void showMenuBar()
         }
         if (ImGui::BeginMenu("Window"))
         {
-            // ImGui::MenuItem("Property Editor", nullptr, &g_show_prop_edit);
+            ImGui::MenuItem("Property Editor", nullptr, &PropEdit::getSingleton()->m_show);
             ImGui::MenuItem("Variable/Event List", nullptr, &VarEdit::getSingleton()->m_show);
-            // ImGui::Separator();
-            // ImGui::MenuItem("List View", nullptr, &g_show_list_view);
+            ImGui::Separator();
+            ImGui::MenuItem("List View", nullptr, &ListView::getSingleton()->m_show);
             // ImGui::MenuItem("Tree View", nullptr, &g_show_tree_view);
             // ImGui::MenuItem("Node View", nullptr, &g_show_node_view);
             ImGui::Separator();
@@ -250,9 +252,9 @@ void showMainWindow()
     showDockSpace();
 
     if (VarEdit::getSingleton()->m_show) VarEdit::getSingleton()->show();
-    // if (g_show_prop_edit) PropEdit::getSingleton()->show();
+    if (PropEdit::getSingleton()->m_show) PropEdit::getSingleton()->show();
 
-    // if (g_show_list_view) ListView::getSingleton()->show();
+    if (ListView::getSingleton()->m_show) ListView::getSingleton()->show();
 
     if (g_show_about) showAboutWindow();
 }

@@ -1,4 +1,5 @@
 #include "hkxfile.h"
+#include "hkclass.inl"
 
 #include <memory>
 #include <execution>
@@ -20,7 +21,7 @@ void HkxFile::loadFile(std::string_view path)
 
     m_obj_list.clear();
     m_obj_class_list.clear();
-    m_ref_list.clear();
+    m_obj_ref_list.clear();
 
     auto result = m_doc.load_file(path.data());
     if (!result)
@@ -73,9 +74,9 @@ void HkxFile::loadFile(std::string_view path)
         return;
     }
 
-    m_graph_data_obj     = getNode(m_graph_obj.find_child_by_attribute("name", "data").text().as_string());
-    m_graph_str_data_obj = getNode(m_graph_data_obj.find_child_by_attribute("name", "stringData").text().as_string());
-    m_var_value_obj      = getNode(m_graph_data_obj.find_child_by_attribute("name", "variableInitialValues").text().as_string());
+    m_graph_data_obj     = getObj(m_graph_obj.find_child_by_attribute("name", "data").text().as_string());
+    m_graph_str_data_obj = getObj(m_graph_data_obj.find_child_by_attribute("name", "stringData").text().as_string());
+    m_var_value_obj      = getObj(m_graph_data_obj.find_child_by_attribute("name", "variableInitialValues").text().as_string());
     if (!(m_graph_data_obj && m_graph_str_data_obj && m_var_value_obj))
     {
         file_logger->error("Couldn't find essential objects! (hkbBehaviorGraphData, hkbBehaviorGraphStringData or hkbVariableValueSet)");
@@ -127,15 +128,16 @@ void HkxFile::saveFile(std::string_view path)
 
 void HkxFile::addRef(std::string_view id, std::string_view parent_id)
 {
-    if (getNode(id) && getNode(parent_id))
-        m_ref_list.find(id)->second.emplace(parent_id);
+    if (getObj(id) && getObj(parent_id))
+        m_obj_ref_list.find(id)->second.emplace(parent_id);
 }
 void HkxFile::deRef(std::string_view id, std::string_view parent_id)
 {
-    if (getNode(id) && getNode(parent_id))
+    if (getObj(id) && getObj(parent_id))
     {
-        if (m_ref_list.find(id)->second.contains(parent_id))
-            m_ref_list.find(id)->second.erase(parent_id);
+        auto& ref_list = m_obj_ref_list.find(id)->second;
+        if (ref_list.contains(parent_id))
+            ref_list.erase(std::string{parent_id});
         else
             spdlog::warn("Attempting to dereference {0} from {1} but {0} is not referenced by {1}!", id, parent_id);
     }
@@ -143,10 +145,10 @@ void HkxFile::deRef(std::string_view id, std::string_view parent_id)
 
 void HkxFile::buildRefList()
 {
-    m_ref_list.clear();
+    m_obj_ref_list.clear();
 
     for (auto& [_, obj] : m_obj_list)
-        m_ref_list[obj.attribute("name").as_string()] = {};
+        m_obj_ref_list[obj.attribute("name").as_string()] = {};
 
     std::for_each(
         std::execution::par,
@@ -162,22 +164,111 @@ void HkxFile::buildRefList()
         }); // try to be fast here
 }
 
+std::string_view HkxFile::addObj(std::string_view hkclass)
+{
+    spdlog::info("Attempting to add new {}", hkclass);
+    if (m_latest_id >= 9999)
+    {
+        spdlog::warn("Exceeding object id limit (9999). Consider doing some cleaning or making a separate file for one of the branches.");
+        return {};
+    }
+
+    auto& class_def_map = getClassDefaultMap();
+    if (class_def_map.contains(hkclass))
+    {
+        auto retval              = appendXmlString(m_data_node, class_def_map.at(hkclass));
+        auto id_str              = std::format("#{:04}", ++m_latest_id);
+        retval.attribute("name") = id_str.c_str();
+
+        m_obj_list[id_str] = retval;
+        if (!m_obj_class_list.contains(hkclass))
+            m_obj_class_list[std::string(hkclass)] = {};
+        m_obj_class_list.find(hkclass)->second.push_back(id_str);
+        m_obj_ref_list[id_str] = {};
+
+        spdlog::info("Added new object {}", id_str);
+        HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
+        return m_obj_list.find(id_str)->first;
+    }
+    else
+    {
+        spdlog::warn("Adding new object of class {} is currently not supported.", hkclass);
+        return {};
+    }
+}
+void HkxFile::delObj(std::string_view id)
+{
+    spdlog::info("Attempting to delete object {}", id);
+
+    auto obj = getObj(id);
+    if (!obj)
+    {
+        spdlog::warn("No object {}", id);
+        return;
+    }
+
+    if (isObjEssential(id))
+    {
+        spdlog::warn("Object {} is essential.", id);
+        return;
+    }
+
+    auto hkclass = obj.attribute("class").as_string();
+
+    if (hasRef(id))
+    {
+        spdlog::warn("Object {} is still referenced by other objects.", id);
+        return;
+    }
+
+    m_data_node.remove_child(obj);
+
+    m_obj_list.erase(m_obj_list.find(id));
+
+    auto class_list = m_obj_class_list.find(hkclass);
+    std::erase(class_list->second, id);
+    if (class_list->second.empty())
+        m_obj_class_list.erase(class_list);
+
+    m_obj_ref_list.erase(m_obj_ref_list.find(id));
+    for (auto& [ref_id, ref_set] : m_obj_ref_list)
+        if (ref_set.contains(id))
+            ref_set.erase(ref_set.find(id));
+
+    spdlog::info("Object {} deleted.", id);
+    HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
+}
+
 // #define FIND_PARAM_VAL(param, val) m_data_node.find_node([=](pugi::xml_node node) { return !strcmp(node.attribute("name").as_string(), param) && (node.text().as_int() == val); });
 
 static bool isVarNode(pugi::xml_node node)
 {
-    return (!strcmp(node.attribute("name").as_string(), "variableIndex") && !strcmp(node.parent().find_child_by_attribute("name", "bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) ||
-        !strcmp(node.attribute("name").as_string(), "syncVariableIndex") ||
-        !strcmp(node.attribute("name").as_string(), "assignmentVariableIndex");
+    auto var_name = node.attribute("name").as_string();
+    return (!strcmp(var_name, "variableIndex") && !strcmp(node.parent().find_child_by_attribute("name", "bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) ||
+        !strcmp(var_name, "syncVariableIndex") || // hkbStateMachine
+        !strcmp(var_name, "assignmentVariableIndex");
 }
 
 static bool isEvtNode(pugi::xml_node node)
 {
-    return !strcmp(node.attribute("name").as_string(), "eventId") ||
-        !strcmp(node.attribute("name").as_string(), "enterEventId") ||
-        !strcmp(node.attribute("name").as_string(), "exitEventId") ||
-        (!strcmp(node.attribute("name").as_string(), "id") && (!strcmp(node.parent().parent().attribute("name").as_string(), "event") || !strcmp(node.parent().parent().attribute("name").as_string(), "events"))) ||
-        !strcmp(node.attribute("name").as_string(), "assignmentEventIndex");
+    auto node_name = node.attribute("name").as_string();
+
+    auto parentparent = node.parent().parent();
+    auto pp_name      = parentparent.attribute("name").as_string();
+    bool is_hkbEvent =
+        !strcmp(pp_name, "event") ||
+        !strcmp(pp_name, "events") ||
+        !strcmp(pp_name, "eventToSendWhenStateOrTransitionChanges"); // hkbStateMachine
+
+    return !strcmp(node_name, "eventId") ||
+        !strcmp(node_name, "enterEventId") ||
+        !strcmp(node_name, "exitEventId") ||
+        !strcmp(node_name, "assignmentEventIndex") ||
+        !strcmp(node_name, "returnToPreviousStateEventId") || // hkbStateMachine
+        !strcmp(node_name, "randomTransitionEventId") ||
+        !strcmp(node_name, "transitionToNextHigherStateEventId") ||
+        !strcmp(node_name, "transitionToNextLowerStateEventId") ||
+        (!strcmp(node_name, "id") && is_hkbEvent);
 }
 
 static bool isPropNode(pugi::xml_node node)

@@ -6,13 +6,14 @@
 
 #include <robin_hood.h>
 #include <pugixml.hpp>
+#include <fmt/format.h>
 
 // for editing flags and enums
 struct EnumWrapper
 {
     std::string_view name;
-    uint32_t         val;
     std::string_view hint = {};
+    uint32_t         val  = 0;
 };
 
 // get index of template argument
@@ -46,6 +47,7 @@ struct StringHash
 };
 template <typename T>
 using StringMap = robin_hood::unordered_map<std::string, T, StringHash, std::equal_to<>>;
+using StringSet = robin_hood::unordered_set<std::string, StringHash, std::equal_to<>>;
 
 //////////////////////////    XML HELPERS
 inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view srcString)
@@ -79,4 +81,17 @@ inline pugi::xml_node getParentObj(pugi::xml_node node)
         if (iter.attribute("class"))
             return iter;
     return {};
+}
+
+inline std::string hkobj2str(pugi::xml_node obj)
+{
+    return fmt::format("{} [{}] - {}", obj.attribute("name").as_string(), obj.find_child_by_attribute("hkparam", "name", "name").text().as_string(), obj.attribute("class").as_string());
+}
+
+inline std::string printIdVector(std::vector<std::string> ids)
+{
+    std::string retval = {};
+    for (size_t i = 0; i < ids.size(); ++i)
+        retval.append(fmt::format("{} {}", ids[i], ((i + 1) % 10) ? "" : "\n"));
+    return retval;
 }

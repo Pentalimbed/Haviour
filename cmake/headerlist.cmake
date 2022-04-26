@@ -13,4 +13,7 @@ set(headers
 	src/ui/widgets.h
 	src/ui/mainwindow.h
 	src/ui/varedit.h
+	src/ui/listview.h
+	src/ui/classinterface.h
+	src/ui/propedit.h
 )
