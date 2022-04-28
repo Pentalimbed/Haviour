@@ -113,7 +113,7 @@ static void loadImGuiFont()
     g_font                        = io.Fonts->AddFontFromFileTTF(g_font_path, g_font_size, &font_cfg, ranges.Data);
 
     // Initialize notify
-    ImGui::MergeIconsWithLatestFont(g_font_size);
+    ImGui::MergeIconsWithLatestFont(g_font_size * 0.9f);
 
     io.Fonts->Build();
 
@@ -190,7 +190,7 @@ void mainLoop()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
         /* MAIN THING HERE */
         Ui::showMainWindow();
         /* MAIN THING HERE */

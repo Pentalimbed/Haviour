@@ -16,4 +16,5 @@ set(headers
 	src/ui/listview.h
 	src/ui/classinterface.h
 	src/ui/propedit.h
+	src/ui/columnview.h
 )

@@ -147,8 +147,7 @@ void ListView::updateCache(bool sort_only)
                             delta = strcmp(a.attribute("name").as_string(), b.attribute("name").as_string());
                             break;
                         case kColName:
-                            delta = strcmp(a.find_child_by_attribute("hkparam", "name", "name").text().as_string(),
-                                           b.find_child_by_attribute("hkparam", "name", "name").text().as_string());
+                            delta = strcmp(getObjContextName(a), getObjContextName(b));
                             break;
                         case kColClass:
                             delta = strcmp(a.attribute("class").as_string(), b.attribute("class").as_string());
@@ -213,14 +212,7 @@ void ListView::drawTable()
                 ImGui::TableNextColumn();
                 copyableText(id.data());
                 ImGui::TableNextColumn();
-                if (strcmp(obj.attribute("class").as_string(), "hkbStringEventPayload"))
-                {
-                    copyableText(obj.find_child_by_attribute("hkparam", "name", "name").text().as_string());
-                }
-                else
-                {
-                    copyableText(obj.find_child_by_attribute("hkparam", "name", "data").text().as_string());
-                }
+                copyableText(getObjContextName(obj));
                 ImGui::TableNextColumn();
                 copyableText(obj.attribute("class").as_string());
                 ImGui::PopID();

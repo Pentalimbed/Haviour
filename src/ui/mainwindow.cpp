@@ -3,6 +3,7 @@
 #include "varedit.h"
 #include "listview.h"
 #include "propedit.h"
+#include "columnview.h"
 
 #include <spdlog/spdlog.h>
 #include <nfd.h>
@@ -213,7 +214,7 @@ void showMenuBar()
             ImGui::MenuItem("Variable/Event List", nullptr, &VarEdit::getSingleton()->m_show);
             ImGui::Separator();
             ImGui::MenuItem("List View", nullptr, &ListView::getSingleton()->m_show);
-            // ImGui::MenuItem("Tree View", nullptr, &g_show_tree_view);
+            ImGui::MenuItem("Column View", nullptr, &ColumnView::getSingleton()->m_show);
             // ImGui::MenuItem("Node View", nullptr, &g_show_node_view);
             ImGui::Separator();
             ImGui::MenuItem("About", nullptr, &g_show_about);
@@ -255,6 +256,7 @@ void showMainWindow()
     if (PropEdit::getSingleton()->m_show) PropEdit::getSingleton()->show();
 
     if (ListView::getSingleton()->m_show) ListView::getSingleton()->show();
+    if (ColumnView::getSingleton()->m_show) ColumnView::getSingleton()->show();
 
     if (g_show_about) showAboutWindow();
 }

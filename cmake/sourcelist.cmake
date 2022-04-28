@@ -14,4 +14,5 @@ set(sources
 	src/ui/listview.cpp
 	src/ui/classinterface.cpp
 	src/ui/propedit.cpp
+	src/ui/columnview.cpp
 )

@@ -17,7 +17,7 @@ struct EnumWrapper
 };
 
 // get index of template argument
-// source https://stackoverflow.com/questions/15014096/c-index-of-type-during-variadic-template-expansion
+// source: https://stackoverflow.com/questions/15014096/c-index-of-type-during-variadic-template-expansion
 template <typename Target, typename ListHead, typename... ListTails>
 constexpr size_t getTypeIndex()
 {
@@ -26,6 +26,29 @@ constexpr size_t getTypeIndex()
     else
         return 1 + getTypeIndex<Target, ListTails...>();
 }
+
+// check template arguments contains stuff
+// source: https://stackoverflow.com/questions/34122177/ensuring-that-a-variadic-template-contains-no-duplicates
+template <typename T, typename... List>
+struct IsContained;
+
+template <typename T, typename Head, typename... Tail>
+struct IsContained<T, Head, Tail...>
+{
+    enum
+    {
+        value = std::is_same<T, Head>::value || IsContained<T, Tail...>::value
+    };
+};
+
+template <typename T>
+struct IsContained<T>
+{
+    enum
+    {
+        value = false
+    };
+};
 
 // using string map without allocation
 // source: https://www.cppstories.com/2021/heterogeneous-access-cpp20/
@@ -83,9 +106,22 @@ inline pugi::xml_node getParentObj(pugi::xml_node node)
     return {};
 }
 
+#define getByName(name) find_child_by_attribute("name", name)
+
+inline const char* getObjContextName(pugi::xml_node obj)
+{
+    auto hkclass = obj.attribute("class").as_string();
+    if (!strcmp(hkclass, "hkbStringEventPayload"))
+        return obj.getByName("data").text().as_string();
+    else if (!strcmp(hkclass, "hkbExpressionCondition"))
+        return obj.getByName("expression").text().as_string();
+    else
+        return obj.getByName("name").text().as_string();
+}
+
 inline std::string hkobj2str(pugi::xml_node obj)
 {
-    return fmt::format("{} [{}] - {}", obj.attribute("name").as_string(), obj.find_child_by_attribute("hkparam", "name", "name").text().as_string(), obj.attribute("class").as_string());
+    return fmt::format("{} [{}] - {}", obj.attribute("name").as_string(), getObjContextName(obj), obj.attribute("class").as_string());
 }
 
 inline std::string printIdVector(std::vector<std::string> ids)

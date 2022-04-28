@@ -30,8 +30,14 @@ public:
 
     void        addRef(std::string_view id, std::string_view parent_id);
     void        deRef(std::string_view id, std::string_view parent_id);
-    inline bool hasRef(std::string_view id) { return !(m_obj_ref_list.contains(id) && m_obj_ref_list.find(id)->second.empty()); }
+    inline bool hasRef(std::string_view id) { return m_obj_ref_by_list.contains(id) && !m_obj_ref_by_list.find(id)->second.empty(); }
     inline void getObjRefs(std::string_view id, std::vector<std::string>& out)
+    {
+        if (m_obj_ref_by_list.contains(id))
+            for (auto& id : m_obj_ref_by_list.find(id)->second)
+                out.push_back(id);
+    }
+    inline void getRefedObjs(std::string_view id, std::vector<std::string>& out)
     {
         if (m_obj_ref_list.contains(id))
             for (auto& id : m_obj_ref_list.find(id)->second)
@@ -70,9 +76,12 @@ public:
         return std::ranges::find(essential_obj, getObj(id)) != essential_obj.end();
     }
 
-    std::string_view addObj(std::string_view hkclass);
-    void             delObj(std::string_view id);
-
+    std::string_view        addObj(std::string_view hkclass);
+    void                    delObj(std::string_view id);
+    inline std::string_view getRootStateMachine()
+    {
+        return m_graph_obj.getByName("rootGenerator").text().as_string();
+    }
 
     AnimationEventManager    m_evt_manager;
     VariableManager          m_var_manager;
@@ -104,6 +113,7 @@ private:
     StringMap<pugi::xml_node>           m_obj_list;
     StringMap<std::vector<std::string>> m_obj_class_list;
     StringMap<StringSet>                m_obj_ref_list;
+    StringMap<StringSet>                m_obj_ref_by_list;
 };
 
 // Managing files

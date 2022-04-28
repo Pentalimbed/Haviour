@@ -128,6 +128,95 @@ DEFENUM(e_hkbStateMachine_StateMachineSelfTransitionMode)
     {"SELF_TRANSITION_MODE_FORCE_TRANSITION_TO_START_STATE", "Transition to the start state using a transition if there is one, or otherwise by abruptly changing states."},
 });
 
+DEFENUM(f_hkbStateMachine_TransitionInfo_TransitionFlags)
+({
+    {"FLAG_USE_TRIGGER_INTERVAL", "Only allow the transition to begin if the event arrives within the interval specified by m_triggerInterval.", 0x1},
+    {"FLAG_USE_INITIATE_INTERVAL", "Only allow the transition to begin within the interval specified by m_initiateInterval.", 0x2},
+    {"FLAG_UNINTERRUPTIBLE_WHILE_PLAYING", "Don't allow the transition to be interrupted while it is underway.", 0x4},
+    {"FLAG_UNINTERRUPTIBLE_WHILE_DELAYED", "Don't allow the transition to be interrupted while it is waiting for the initiate interval to come.", 0x8},
+    {"FLAG_DELAY_STATE_CHANGE", "Change states at the end of the transition instead of the beginning.", 0x10},
+    {"FLAG_DISABLED", "Disable the transition.", 0x20},
+    {"FLAG_DISALLOW_RETURN_TO_PREVIOUS_STATE", "Don't use this transition to return to the previous state.", 0x40},
+    {"FLAG_DISALLOW_RANDOM_TRANSITION", "Don't use this transition as a random transition.", 0x80},
+    {"FLAG_DISABLE_CONDITION", "Disable the condition (effectively making it always true).", 0x100},
+    {"FLAG_ALLOW_SELF_TRANSITION_BY_TRANSITION_FROM_ANY_STATE",
+     "Whether or not to allow this transition to do a self-transition.\n"
+     "This flag is only considered for transitions from any state (see addTransitionFromAnyState()).\n"
+     "Regular transitions specify both the source and destination state, so there is no need for an additional flag.",
+     0x200},
+    {"FLAG_IS_GLOBAL_WILDCARD",
+     "This transition is global, which means it can happen no matter what the active subgraph is.\n"
+     "This flag is only considered for transitions from-any-state (wildcards).",
+     0x400},
+    {"FLAG_IS_LOCAL_WILDCARD",
+     "If you want the transition to be used as a regular (local) wildcard, set this flag.\n"
+     "This is useful if you want to have a different transition effect for a global wildcard transition than for local wildcard transition.",
+     0x800},
+    {"FLAG_FROM_NESTED_STATE_ID_IS_VALID", "Whether m_fromNestedStateId should be used.", 0x1000},
+    {"FLAG_TO_NESTED_STATE_ID_IS_VALID", "Whether m_toNestedStateId should be used.", 0x2000},
+    {"FLAG_ABUT_AT_END_OF_FROM_GENERATOR", "Whether to delay until the end of the from generator, minus the blend lead time.", 0x4000},
+});
+
+DEFENUM(e_hkbTransitionEffect_SelfTransitionMode)
+({
+    {"SELF_TRANSITION_MODE_CONTINUE_IF_CYCLIC_BLEND_IF_ACYCLIC",
+     "If the to-generator is cyclic, it will be continued without interruption.\n"
+     "Otherwise, it will be blended with itself using the echo feature."},
+    {"SELF_TRANSITION_MODE_CONTINUE", "Continue the to-generator without interruption."},
+    {"SELF_TRANSITION_MODE_RESET", "Reset the to-generator to the beginning."},
+    {"SELF_TRANSITION_MODE_BLEND", "Reset the to-generator to the beginning using the echo feature to blend. "},
+});
+
+DEFENUM(e_hkbTransitionEffect_EventMode)
+({
+    {"EVENT_MODE_DEFAULT", "Apply the event mode from m_defaultEventMode."},
+    {"EVENT_MODE_PROCESS_ALL", "Don't ignore the events of either the from-generator or the to-generator."},
+    {"EVENT_MODE_IGNORE_FROM_GENERATOR", "Ignore all events sent by or to the from-generator."},
+    {"EVENT_MODE_IGNORE_TO_GENERATOR", "Ignore all events sent by or to the to-generator."},
+});
+
+DEFENUM(f_hkbBlendingTransitionEffect_FlagBits)
+({
+    {"FLAG_NONE", "No flags.", 0x0},
+    {"FLAG_IGNORE_FROM_WORLD_FROM_MODEL", "Just use the worldFromModel of the generator being transitioned to.", 0x1},
+    {"FLAG_SYNC", "Synchronize the cycles of the children.", 0x2},
+    {"FLAG_IGNORE_TO_WORLD_FROM_MODEL", "Just use the worldFromModel of the generator being transitioned from.", 0x4},
+    {"FLAG_IGNORE_TO_WORLD_FROM_MODEL_ROTATION", "Blend the to and from world from models but ignore the to generator's rotation", 0x8},
+});
+
+DEFENUM(e_hkbBlendingTransitionEffect_EndMode)
+({
+    {"END_MODE_NONE"},
+    {"END_MODE_TRANSITION_UNTIL_END_OF_FROM_GENERATOR", "Ignore m_duration, and instead transition until the end of the \"from\" generator."},
+    {"END_MODE_CAP_DURATION_AT_END_OF_FROM_GENERATOR",
+     "If the transition begins closer than m_duration to the end of the \"from\" generator,\n"
+     "shorten the transition duration to the time remaining so that the transition does not play the \"from\" generator beyond the end."},
+});
+
+DEFENUM(e_hkbBlendCurveUtils_BlendCurve)
+({
+    {"BLEND_CURVE_SMOOTH", "A cubic curve that is smooth at the endpoints: f(t) = -6 t^3 + 3 t^2."},
+    {"BLEND_CURVE_LINEAR", "A linear curve: f(t) = t."},
+    {"BLEND_CURVE_LINEAR_TO_SMOOTH", "A cubic curve that is abrupt at the beginning and smooth at the end: f(t) = -t^3 + t^2 + t"},
+    {"BLEND_CURVE_SMOOTH_TO_LINEAR", "A cubic curve that is smooth at the beginning and abrupt at the end: f(t) = -t^3 + 2 t^2"},
+});
+
+DEFENUM(f_hkbBlenderGenerator_BlenderFlags)
+({
+    {"FLAG_SYNC", "Adjusts the speed of the children so that their cycles align (default: false).", 0x1},
+    {"FLAG_SMOOTH_GENERATOR_WEIGHTS",
+     "Filter the weights using a cubic curve.\n\n"
+     "If true, the generator weights are passed through a cubic filter. The new weight w is computed as w = w^2 * (-2w + 3).\n"
+     "This makes it so that you can move the weights linearly as a function of time and get a smooth result.",
+     0x4},
+    {"FLAG_DONT_DEACTIVATE_CHILDREN_WITH_ZERO_WEIGHTS", "If true, a child will not be deactivated when its weight is zero.", 0x8},
+    {"FLAG_PARAMETRIC_BLEND", "This is a parametric blend", 0x10},
+    {"FLAG_IS_PARAMETRIC_BLEND_CYCLIC", "If the blend is parametric, setting this makes it cyclic parametric blend.", 0x20},
+    {"FLAG_FORCE_DENSE_POSE", "Force the output pose to be dense by filling in any missing bones with the reference pose.", 0x40},
+    {"FLAG_BLEND_MOTION_OF_ADDITIVE_ANIMATIONS", "Blend the motion of additive and subtractive animations.", 0x80},
+    {"FLAG_USE_VELOCITY_SYNCHRONIZATION", "Use the velocity-based synchronization", 0x100},
+});
+
 //////////////////////////    DEFAULT VALUES
 constexpr const char* g_def_hkbVariableInfo =
     R"(<hkobject>
@@ -152,8 +241,19 @@ constexpr const char* g_def_hkbEventInfo =
     <hkparam name="flags">0</hkparam>
 </hkobject>)";
 
+constexpr const char* g_def_hkbEvent =
+    R"(<hkobject>
+    <hkparam name="id">0</hkparam>
+    <hkparam name="payload">null</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbStringEventPayload =
+    R"(<hkobject name="#0000" class="hkbStringEventPayload" signature="0xed04256a">
+    <hkparam name="data">DLC02AnimObjectHeart</hkparam>
+</hkobject>)";
+
 constexpr const char* g_def_hkbVariableBindingSet =
-    R"(<hkobject name="#0112" class="hkbVariableBindingSet" signature="0x338ad4ff">
+    R"(<hkobject name="#0000" class="hkbVariableBindingSet" signature="0x338ad4ff">
     <hkparam name="bindings" numelements="0"></hkparam>
     <hkparam name="indexOfBindingToEnable">-1</hkparam>
 </hkobject>)";
@@ -167,7 +267,7 @@ constexpr const char* g_def_hkbVariableBindingSet_Binding =
 </hkobject>)";
 
 constexpr const char* g_def_hkbStateMachine =
-    R"(<hkobject name="#1255" class="hkbStateMachine" signature="0x816c1dcb">
+    R"(<hkobject name="#0000" class="hkbStateMachine" signature="0x816c1dcb">
     <hkparam name="variableBindingSet">null</hkparam>
     <hkparam name="userData">0</hkparam>
     <hkparam name="name">StateMachine</hkparam>
@@ -192,6 +292,96 @@ constexpr const char* g_def_hkbStateMachine =
     <hkparam name="wildcardTransitions">null</hkparam>
 </hkobject>)";
 
+constexpr const char* g_def_hkbStateMachineStateInfo =
+    R"(<hkobject name="#0000" class="hkbStateMachineStateInfo" signature="0xed7f9d0">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="listeners" numelements="0"></hkparam>
+    <hkparam name="enterNotifyEvents">null</hkparam>
+    <hkparam name="exitNotifyEvents">null</hkparam>
+    <hkparam name="transitions">null</hkparam>
+    <hkparam name="generator">null</hkparam>
+    <hkparam name="name">State</hkparam>
+    <hkparam name="stateId">0</hkparam>
+    <hkparam name="probability">1.000000</hkparam>
+    <hkparam name="enable">true</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbStateMachine_TransitionInfo =
+    R"(<hkobject>
+    <hkparam name="triggerInterval">
+        <hkobject>
+            <hkparam name="enterEventId">-1</hkparam>
+            <hkparam name="exitEventId">-1</hkparam>
+            <hkparam name="enterTime">0.000000</hkparam>
+            <hkparam name="exitTime">0.000000</hkparam>
+        </hkobject>
+    </hkparam>
+    <hkparam name="initiateInterval">
+        <hkobject>
+            <hkparam name="enterEventId">-1</hkparam>
+            <hkparam name="exitEventId">-1</hkparam>
+            <hkparam name="enterTime">0.000000</hkparam>
+            <hkparam name="exitTime">0.000000</hkparam>
+        </hkobject>
+    </hkparam>
+    <hkparam name="transition">null</hkparam>
+    <hkparam name="condition">null</hkparam>
+    <hkparam name="eventId">0</hkparam>
+    <hkparam name="toStateId">0</hkparam>
+    <hkparam name="fromNestedStateId">0</hkparam>
+    <hkparam name="toNestedStateId">0</hkparam>
+    <hkparam name="priority">0</hkparam>
+    <hkparam name="flags">0</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbStateMachineTransitionInfoArray =
+    R"(<hkobject name="#0000" class="hkbStateMachineTransitionInfoArray" signature="0xe397b11e">
+    <hkparam name="transitions" numelements="0"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbBlendingTransitionEffect =
+    R"(<hkobject name="#0000" class="hkbBlendingTransitionEffect" signature="0xfd8584fe">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="userData">0</hkparam>
+    <hkparam name="name">BlendTransition</hkparam>
+    <hkparam name="selfTransitionMode">SELF_TRANSITION_MODE_BLEND</hkparam>
+    <hkparam name="eventMode">EVENT_MODE_DEFAULT</hkparam>
+    <hkparam name="duration">0.000000</hkparam>
+    <hkparam name="toGeneratorStartTimeFraction">0.000000</hkparam>
+    <hkparam name="flags">0</hkparam>
+    <hkparam name="endMode">END_MODE_NONE</hkparam>
+    <hkparam name="blendCurve">BLEND_CURVE_SMOOTH</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbExpressionCondition =
+    R"(<hkobject name="#0000" class="hkbExpressionCondition" signature="0x1c3c1045">
+    <hkparam name="expression"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbBlenderGenerator =
+    R"(<hkobject name="#0000" class="hkbBlenderGenerator" signature="0x22df7147">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="userData">0</hkparam>
+    <hkparam name="name">BlenderGenerator</hkparam>
+    <hkparam name="referencePoseWeightThreshold">0.000000</hkparam>
+    <hkparam name="blendParameter">0.000000</hkparam>
+    <hkparam name="minCyclicBlendParameter">0.000000</hkparam>
+    <hkparam name="maxCyclicBlendParameter">1.000000</hkparam>
+    <hkparam name="indexOfSyncMasterChild">0</hkparam>
+    <hkparam name="flags">0</hkparam>
+    <hkparam name="subtractLastChild">false</hkparam>
+    <hkparam name="children" numelements="0"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbBlenderGeneratorChild =
+    R"(<hkobject name="#0000" class="hkbBlenderGeneratorChild" signature="0xe2b384b0">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="generator">null</hkparam>
+    <hkparam name="boneWeights">null</hkparam>
+    <hkparam name="weight">0.000000</hkparam>
+    <hkparam name="worldFromModelWeight">1.000000</hkparam>
+</hkobject>)";
+
 inline const std::map<std::string_view, const char*>& getClassDefaultMap()
 {
 #define DEFMAPITEM(hkclass)       \
@@ -201,8 +391,32 @@ inline const std::map<std::string_view, const char*>& getClassDefaultMap()
 
     static const std::map<std::string_view, const char*> map = {
         DEFMAPITEM(hkbVariableBindingSet),
-        DEFMAPITEM(hkbStateMachine)};
+        DEFMAPITEM(hkbStateMachine),
+        DEFMAPITEM(hkbStateMachineStateInfo),
+        DEFMAPITEM(hkbStringEventPayload),
+        DEFMAPITEM(hkbStateMachineTransitionInfoArray),
+        DEFMAPITEM(hkbBlendingTransitionEffect),
+        DEFMAPITEM(hkbExpressionCondition),
+        DEFMAPITEM(hkbBlenderGenerator),
+        DEFMAPITEM(hkbBlenderGeneratorChild)};
     return map;
 }
+
+//////////////////////////    CLASS OF CLASSES
+
+constexpr auto g_class_generators = std::to_array<std::string_view>(
+    {"hkbStateMachine",
+     "hkbManualSelectorGenerator",
+     "hkbModifierGenerator",
+     "BSiStateTaggingGenerator",
+     "BSSynchronizedClipGenerator",
+     "BSOffsetAnimationGenerator",
+     "BSCyclicBlendTransitionGenerator",
+     "hkbPoseMatchingGenerator",
+     "hkbClipGenerator",
+     "hkbBehaviorReferenceGenerator",
+     "hkbBlenderGenerator",
+     "BSBoneSwitchGenerator"});
+
 } // namespace Hkx
 } // namespace Haviour

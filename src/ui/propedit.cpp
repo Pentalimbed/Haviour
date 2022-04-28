@@ -118,11 +118,11 @@ void PropEdit::show()
                     auto class_str = edit_obj.attribute("class").as_string();
 
                     ImGui::SameLine();
-                    if (ImGui::Button("Copy"))
+                    if (ImGui::Button(ICON_FA_COPY))
                         ImGui::SetClipboardText(m_edit_obj_id.c_str());
-                    addTooltip("Copy object ID.");
+                    addTooltip("Copy\nCopy object ID.");
                     ImGui::SameLine();
-                    if (ImGui::Button("Paste"))
+                    if (ImGui::Button(ICON_FA_PASTE))
                     {
                         auto copied_obj = file.getObj(ImGui::GetClipboardText());
                         if (copied_obj && !strcmp(copied_obj.attribute("class").as_string(), class_str))
@@ -134,13 +134,13 @@ void PropEdit::show()
                         else
                             spdlog::warn("Copied object either not exist or is of different class.");
                     }
-                    addTooltip("If ID in clipboard, override all values except ID");
+                    addTooltip("Paste\nIf ID in clipboard, override all values except ID.");
 
                     auto& def_map = Hkx::getClassDefaultMap();
                     if (def_map.contains(class_str))
                     {
                         ImGui::SameLine();
-                        if (ImGui::Button("Clear"))
+                        if (ImGui::Button(ICON_FA_RECYCLE))
                         {
                             std::string_view   def_str = def_map.at(class_str);
                             pugi::xml_document doc;
@@ -153,8 +153,11 @@ void PropEdit::show()
                             else
                                 spdlog::warn("Failed to load default value for class {}", class_str);
                         }
-                        addTooltip("Set all to default value");
+                        addTooltip("Reset.\nSet all parameteres to default.");
                     }
+                    ImGui::SameLine();
+                    ImGui::Button(ICON_FA_SCROLL);
+                    addTooltip("Macros - Upcoming!");
 
                     if (file.isObjEssential(m_edit_obj_id))
                     {

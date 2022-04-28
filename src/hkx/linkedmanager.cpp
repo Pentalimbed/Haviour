@@ -40,7 +40,7 @@ Variable VariableManager::addEntry(VariableTypeEnum data_type)
 {
     auto retval = addEntry();
 
-    retval.get<PropVarInfo>().find_child_by_attribute("name", "type").text() = e_variableType[data_type + 1].data();
+    retval.get<PropVarInfo>().getByName("type").text() = e_variableType[data_type + 1].data();
 
     switch (data_type)
     {
@@ -67,7 +67,7 @@ robin_hood::unordered_map<size_t, size_t> VariableManager::reindex()
     std::vector<std::vector<Variable*>> quad_users(m_quads.size());
     for (auto& entry : m_entries)
     {
-        auto data_type = getVarTypeEnum(entry.get<PropVarInfo>().find_child_by_attribute("name", "type").text().as_string());
+        auto data_type = getVarTypeEnum(entry.get<PropVarInfo>().getByName("type").text().as_string());
         switch (data_type)
         {
             // case VARIABLE_TYPE_POINTER:

@@ -27,7 +27,7 @@ private:
     std::string m_edit_obj_id_input;
     std::string m_edit_obj_id;
 
-    static constexpr size_t m_history_len = 30;
+    static constexpr size_t m_history_len = 100;
     std::deque<std::string> m_history;
 
     void showHistoryList();

@@ -55,32 +55,33 @@ private:
         }
     }
 
+    NodeArray m_props;
+
 public:
     template <class T>
     constexpr pugi::xml_node get() { return m_props[getTypeIndex<T, Props...>()]; }
 
-    inline static LinkedPropertyEntry<Props...> create(NodeArray& containers)
+    std::enable_if_t<IsContained<PropName, Props...>::value, const char*> getName() { return get<PropName>().text().as_string(); }
+
+    static LinkedPropertyEntry<Props...> create(NodeArray& containers)
     {
         LinkedPropertyEntry<Props...> retval;
         retval.m_valid = true;
         retval.addProp(containers);
         return retval;
     }
-    inline static LinkedPropertyEntry<Props...> assemble(const NodeArray& nodes)
+    static LinkedPropertyEntry<Props...> assemble(const NodeArray& nodes)
     {
         LinkedPropertyEntry<Props...> retval;
         retval.m_valid = true;
         retval.m_props = nodes;
         return retval;
     }
-    inline void remove(NodeArray& containers)
+    void remove(NodeArray& containers)
     {
         for (size_t i = 0; i < containers.size(); ++i)
             containers[i].remove_child(m_props[i]);
     }
-
-private:
-    NodeArray m_props;
 };
 
 using AnimationEvent    = LinkedPropertyEntry<PropName, PropEventInfo>;
@@ -94,6 +95,7 @@ public:
     using Entry = typename T;
 
     inline size_t         size() { return m_entries.size(); }
+    inline T              getEntry(size_t idx) { return m_entries[idx]; }
     inline std::vector<T> getEntryList() { return m_entries; }
     inline T              addEntry()
     {
@@ -174,8 +176,8 @@ public:
     {
         auto retval = LinkedPropertyManager<CharacterProperty>::addEntry();
 
-        retval.get<PropVarInfo>().find_child_by_attribute("name", "type").text()                                                        = "VARIABLE_TYPE_POINTER";
-        retval.get<PropVarInfo>().find_child_by_attribute("name", "role").first_child().find_child_by_attribute("name", "flags").text() = "FLAG_OUTPUT|FLAG_HIDDEN|FLAG_NOT_VARIABLE|FLAG_NONE";
+        retval.get<PropVarInfo>().getByName("type").text()                                  = "VARIABLE_TYPE_POINTER";
+        retval.get<PropVarInfo>().getByName("role").first_child().getByName("flags").text() = "FLAG_OUTPUT|FLAG_HIDDEN|FLAG_NOT_VARIABLE|FLAG_NONE";
 
         return retval;
     }

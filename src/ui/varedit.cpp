@@ -60,12 +60,6 @@ void VarEdit::showVarList()
     constexpr auto table_flag =
         ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
-    const static auto color_invalid = ImColor(0.2f, 0.2f, 0.2f).Value;
-    const static auto color_bool    = ImColor(0xFF, 0x9C, 0x83).Value;
-    const static auto color_int     = ImColor(0x07, 0xd2, 0xd9).Value;
-    const static auto color_float   = ImColor(0xF6, 0x6f, 0x9a).Value;
-    const static auto color_attr    = ImColor(0x9d, 0x00, 0x1c).Value;
-    const static auto color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
 
     bool  scroll_to_bottom = false;
     auto  file_manager     = Hkx::HkxFileManager::getSingleton();
@@ -102,12 +96,12 @@ void VarEdit::showVarList()
     if (ImGui::IsItemHovered())
     {
         ImGui::BeginTooltip();
-        ImGui::TextColored(color_invalid, "Invalid");
-        ImGui::TextColored(color_bool, "Boolean");
-        ImGui::TextColored(color_int, "Int8/16/32");
-        ImGui::TextColored(color_float, "Real");
-        ImGui::TextColored(color_attr, "Pointer");
-        ImGui::TextColored(color_quad, "Vector/Quaternion");
+        ImGui::TextColored(g_color_invalid, "Invalid");
+        ImGui::TextColored(g_color_bool, "Boolean");
+        ImGui::TextColored(g_color_int, "Int8/16/32");
+        ImGui::TextColored(g_color_float, "Real");
+        ImGui::TextColored(g_color_attr, "Pointer");
+        ImGui::TextColored(g_color_quad, "Vector/Quaternion");
         ImGui::EndTooltip();
     }
     ImGui::Separator();
@@ -136,20 +130,20 @@ void VarEdit::showVarList()
 
                 ImGui::TableNextColumn();
 
-                auto var_type      = var.get<Hkx::PropVarInfo>().find_child_by_attribute("name", "type").text().as_string();
+                auto var_type      = var.get<Hkx::PropVarInfo>().getByName("type").text().as_string();
                 auto var_type_enum = Hkx::getVarTypeEnum(var_type);
                 if (var_type_enum < 0)
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_invalid);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_invalid);
                 else if (var_type_enum < 1)
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_bool);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_bool);
                 else if (var_type_enum < 4)
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_int);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_int);
                 else if (var_type_enum < 5)
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_float);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_float);
                 else if (var_type_enum < 6)
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_attr);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_attr);
                 else
-                    ImGui::PushStyleColor(ImGuiCol_Text, color_quad);
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_quad);
                 ImGui::Text("%d", var.m_index);
                 addTooltip(var_type);
                 ImGui::PopStyleColor();
