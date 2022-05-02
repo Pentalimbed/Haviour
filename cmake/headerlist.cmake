@@ -9,6 +9,7 @@ set(headers
 	src/hkx/hkclass.inl
 	src/hkx/linkedmanager.h
 	src/hkx/hkxfile.h
+	src/hkx/hkutils.h
 
 	src/ui/widgets.h
 	src/ui/mainwindow.h

@@ -39,11 +39,14 @@ public:
     }
     inline void getRefedObjs(std::string_view id, std::vector<std::string>& out)
     {
+        auto temp_size = out.size();
         if (m_obj_ref_list.contains(id))
             for (auto& id : m_obj_ref_list.find(id)->second)
                 out.push_back(id);
+        std::sort(out.begin() + temp_size, out.end());
     }
     void buildRefList();
+    void buildRefList(std::string_view id);
 
     inline pugi::xml_node getObj(std::string_view id)
     {

@@ -71,51 +71,74 @@ void ColumnView::show()
                 size_t                   column_idx = 0;
                 for (auto& column : m_columns)
                 {
-                    std::ranges::sort(reflist);
-                    if (std::ranges::find(reflist, column.m_selected) == reflist.end())
-                        column.m_selected = "";
-
                     if (ImGui::BeginTable(std::format("{}", column_idx).c_str(), 2, table_flag, {200.0f, -FLT_MIN}))
                     {
                         for (auto& ref : reflist)
                         {
-                            auto ref_obj   = file.getObj(ref);
-                            auto ref_class = ref_obj.attribute("class").as_string();
-
-                            if (m_class_show.contains(ref_class))
+                            if (ref.starts_with('#'))
                             {
-                                bool        is_selected = column.m_selected == ref_obj.attribute("name").as_string();
-                                std::string disp_name   = ref_obj.getByName("name").text().as_string();
-                                if (disp_name.empty())
-                                    disp_name = ref_obj.attribute("name").as_string();
+                                auto ref_obj   = file.getObj(ref);
+                                auto ref_class = ref_obj.attribute("class").as_string();
 
-                                ImGui::PushID(disp_name.c_str());
+                                if (m_class_show.contains(ref_class))
+                                {
+                                    bool        is_selected = column.m_selected.contains(ref);
+                                    std::string disp_name   = ref_obj.getByName("name").text().as_string();
+                                    if (disp_name.empty())
+                                        disp_name = ref_obj.attribute("name").as_string();
+
+                                    ImGui::PushID(disp_name.c_str());
+                                    ImGui::TableNextColumn();
+                                    if (ImGui::Button(ICON_FA_PEN))
+                                        PropEdit::getSingleton()->setObject(ref);
+                                    addTooltip("Edit");
+
+                                    ImGui::TableNextColumn();
+
+                                    if (m_class_color_map.contains(ref_class))
+                                        ImGui::PushStyleColor(ImGuiCol_Text, m_class_color_map.at(ref_class).Value);
+                                    if (ImGui::Selectable(disp_name.c_str(), is_selected))
+                                    {
+                                        if (is_selected)
+                                            column.m_selected.erase(ref);
+                                        else
+                                            column.m_selected.emplace(ref);
+                                    }
+                                    if (m_class_color_map.contains(ref_class))
+                                        ImGui::PopStyleColor();
+
+                                    addTooltip(disp_name.c_str());
+                                    ImGui::PopID();
+                                }
+                            }
+                            else
+                            {
                                 ImGui::TableNextColumn();
-                                if (ImGui::Button(ICON_FA_PEN_SQUARE))
-                                    PropEdit::getSingleton()->setObject(ref);
-                                addTooltip("Edit");
                                 ImGui::TableNextColumn();
-                                if (m_class_color_map.contains(ref_class))
-                                    ImGui::PushStyleColor(ImGuiCol_Text, m_class_color_map.at(ref_class).Value);
-                                if (ImGui::Selectable(disp_name.c_str(), is_selected))
-                                    column.m_selected = is_selected ? "" : ref;
-                                if (m_class_color_map.contains(ref_class))
-                                    ImGui::PopStyleColor();
-                                addTooltip(disp_name.c_str());
-                                ImGui::PopID();
+                                ImGui::TextUnformatted(ref.c_str());
+                                addTooltip(ref.c_str());
                             }
                         }
                         ImGui::EndTable();
                     }
                     ImGui::SameLine();
 
-                    if (column.m_selected.empty())
+                    auto reflist_copy = reflist;
+                    reflist.clear();
+                    for (auto& ref : reflist_copy)
+                        if (column.m_selected.contains(ref))
+                        {
+                            auto        ref_obj   = file.getObj(ref);
+                            std::string disp_name = ref_obj.getByName("name").text().as_string();
+                            if (disp_name.empty())
+                                disp_name = ref_obj.attribute("name").as_string();
+
+                            reflist.push_back("> " + disp_name);
+                            file.getRefedObjs(ref, reflist);
+                        }
+
+                    if (reflist.empty())
                         break;
-                    else
-                    {
-                        reflist.clear();
-                        file.getRefedObjs(column.m_selected, reflist);
-                    }
 
                     ++column_idx;
                 }

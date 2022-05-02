@@ -202,7 +202,7 @@ void ListView::drawTable()
                 ImGui::PushID(id.data());
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                if (ImGui::Button(ICON_FA_PEN_SQUARE)) // Edit
+                if (ImGui::Button(ICON_FA_PEN)) // Edit
                     PropEdit::getSingleton()->setObject(id);
                 addTooltip("Edit");
                 ImGui::SameLine();

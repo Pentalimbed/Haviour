@@ -94,8 +94,14 @@ class LinkedPropertyManager
 public:
     using Entry = typename T;
 
-    inline size_t         size() { return m_entries.size(); }
-    inline T              getEntry(size_t idx) { return m_entries[idx]; }
+    inline size_t size() { return m_entries.size(); }
+    inline T      getEntry(size_t idx)
+    {
+        if (idx < m_entries.size())
+            return m_entries[idx];
+        else
+            return {};
+    }
     inline std::vector<T> getEntryList() { return m_entries; }
     inline T              addEntry()
     {

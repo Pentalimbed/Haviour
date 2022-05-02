@@ -11,6 +11,12 @@
 
 namespace Haviour
 {
+
+namespace Hkx
+{
+VariableTypeEnum getVarTypeEnum(std::string_view enumstr);
+}
+
 namespace Ui
 {
 const auto g_color_invalid = ImColor(0.2f, 0.2f, 0.2f).Value;
@@ -25,7 +31,6 @@ const auto g_color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
     addTooltip("Left click to copy text");     \
     if (ImGui::IsItemClicked())                \
         ImGui::SetClipboardText(text);
-
 
 #define addTooltip(...) \
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
@@ -70,13 +75,37 @@ bool linkedPropPickerPopup(const char* str_id,
                 if (prop.m_valid)
                 {
                     auto prop_disp_name = fmt::format("{:4} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string());
+
+                    if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                    {
+                        auto var_type      = prop.get<Hkx::PropVarInfo>().getByName("type").text().as_string();
+                        auto var_type_enum = Hkx::getVarTypeEnum(var_type);
+                        if (var_type_enum < 0)
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_invalid);
+                        else if (var_type_enum < 1)
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_bool);
+                        else if (var_type_enum < 4)
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_int);
+                        else if (var_type_enum < 5)
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_float);
+                        else if (var_type_enum < 6)
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_attr);
+                        else
+                            ImGui::PushStyleColor(ImGuiCol_Text, g_color_quad);
+                    }
+
                     if (ImGui::Selectable(prop_disp_name.c_str()))
                     {
-                        ImGui::CloseCurrentPopup();
                         out = prop;
+                        if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                            ImGui::PopStyleColor();
+                        ImGui::CloseCurrentPopup();
                         ImGui::EndPopup();
                         return true;
                     }
+
+                    if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                        ImGui::PopStyleColor();
                 }
             }
 
@@ -159,6 +188,8 @@ void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array
 
 void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine);
 
+void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::HkxFile& file);
+
 ////////////////    EDITS
 inline void fullTableSeparator()
 {
@@ -176,6 +207,7 @@ void stringEdit(pugi::xml_node   hkparam,
                 std::string_view manual_name = {});
 
 void boolEdit(pugi::xml_node   hkparam,
+              Hkx::HkxFile&    file,
               std::string_view hint        = {},
               std::string_view manual_name = {});
 
@@ -204,13 +236,13 @@ void enumEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& enums, s
     ImGui::TableNextColumn();
 }
 
-void intScalarEdit(pugi::xml_node hkparam, ImGuiDataType data_type = ImGuiDataType_S32, std::string_view hint = {}, std::string_view manual_name = {});
+void intScalarEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, ImGuiDataType data_type = ImGuiDataType_S32, std::string_view hint = {}, std::string_view manual_name = {});
 
-void sliderIntEdit(pugi::xml_node   hkparam,
-                   int              lb,
-                   int              ub,
-                   std::string_view hint        = {},
-                   std::string_view manual_name = {});
+// void sliderIntEdit(pugi::xml_node   hkparam,
+//                    int              lb,
+//                    int              ub,
+//                    std::string_view hint        = {},
+//                    std::string_view manual_name = {});
 
 template <size_t N>
 void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {}, bool as_int = false)
@@ -225,13 +257,14 @@ void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, s
 
 template <typename Prop, typename Manager>
 void linkedPropPickerEdit(pugi::xml_node   hkparam,
+                          Hkx::HkxFile&    file,
                           Manager&         prop_manager,
                           std::string_view hint        = {},
                           std::string_view manual_name = {})
 {
     ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
 
-    intScalarEdit(hkparam, ImGuiDataType_S32, hint, manual_name);
+    intScalarEdit(hkparam, file, ImGuiDataType_S32, hint, manual_name);
 
     Prop out_prop;
     if (linkedPropPickerPopup("PickProp", prop_manager, out_prop))
@@ -239,6 +272,9 @@ void linkedPropPickerEdit(pugi::xml_node   hkparam,
     if (ImGui::Button(ICON_FA_SEARCH))
         ImGui::OpenPopup("PickProp");
     addTooltip("Select");
+    ImGui::SameLine();
+    if (hkparam.text().as_int() >= 0)
+        ImGui::TextUnformatted(prop_manager.getEntry(hkparam.text().as_ullong()).getName());
 
     ImGui::PopID();
 }
@@ -246,10 +282,12 @@ void linkedPropPickerEdit(pugi::xml_node   hkparam,
 void sliderFloatEdit(pugi::xml_node   hkparam,
                      float            lb,
                      float            ub,
+                     Hkx::HkxFile&    file,
                      std::string_view hint        = {},
                      std::string_view manual_name = {});
 
 void floatEdit(pugi::xml_node   hkparam,
+               Hkx::HkxFile&    file,
                std::string_view hint        = {},
                std::string_view manual_name = {});
 
@@ -282,11 +320,19 @@ void refList(pugi::xml_node                       hkparam,
              std::string_view                     name_attribute = {},
              std::string_view                     manual_name    = {});
 
-void stateEdit(pugi::xml_node hkparam,
-               Hkx::HkxFile&  file,
-               //    pugi::xml_node   state_machine = {},
-               std::string_view hint        = {},
-               std::string_view manual_name = {});
+pugi::xml_node refLiveEditList(
+    pugi::xml_node                       hkparam,
+    const std::vector<std::string_view>& classes,
+    Hkx::HkxFile&                        file,
+    std::string_view                     hint_attribute = {},
+    std::string_view                     name_attribute = {},
+    std::string_view                     manual_name    = {});
+
+void stateEdit(pugi::xml_node   hkparam,
+               Hkx::HkxFile&    file,
+               pugi::xml_node   state_machine = {},
+               std::string_view hint          = {},
+               std::string_view manual_name   = {});
 
 ////////////////    Linked Prop Edits
 

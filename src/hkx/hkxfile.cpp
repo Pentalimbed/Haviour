@@ -1,5 +1,6 @@
 #include "hkxfile.h"
 #include "hkclass.inl"
+#include "hkutils.h"
 
 #include <memory>
 #include <execution>
@@ -169,9 +170,8 @@ void HkxFile::buildRefList()
         m_obj_list.begin(), m_obj_list.end(),
         [=](auto entry) {
             std::string_view id = entry.second.attribute("name").as_string();
-            for (auto& [_, parent_obj] : m_obj_list)
+            for (auto& [parent_id, parent_obj] : m_obj_list)
             {
-                std::string_view parent_id = parent_obj.attribute("name").as_string();
                 if (id != parent_id && isRefBy(id, parent_obj))
                     if (getObj(id) && getObj(parent_id))
                         m_obj_ref_by_list.find(id)->second.emplace(parent_id);
@@ -180,6 +180,19 @@ void HkxFile::buildRefList()
     for (auto& [id, ref_by] : m_obj_ref_by_list)
         for (auto parent : ref_by)
             m_obj_ref_list.find(parent)->second.emplace(id);
+}
+void HkxFile::buildRefList(std::string_view id)
+{
+    auto obj = getObj(id);
+    if (!obj) return;
+
+    auto refed_objs = m_obj_ref_list.find(id)->second;
+    for (auto ref_obj_id : refed_objs)
+        deRef(ref_obj_id, id);
+
+    for (auto& [ref_id, ref_obj] : m_obj_list)
+        if (id != ref_id && isRefBy(ref_id, obj))
+            addRef(ref_id, id);
 }
 
 std::string_view HkxFile::addObj(std::string_view hkclass)

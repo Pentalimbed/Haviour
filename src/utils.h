@@ -85,13 +85,7 @@ inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view sr
     return target.append_copy(doc.first_child());
 }
 
-inline pugi::xml_node getNthChild(pugi::xml_node target, uint32_t n)
-{
-    auto node = target.first_child();
-    while (node && (n > 1))
-        node = node.next_sibling();
-    return node;
-}
+#define getByName(name) find_child_by_attribute("name", name)
 
 inline bool isRefBy(std::string_view id, pugi::xml_node obj)
 {
@@ -100,13 +94,11 @@ inline bool isRefBy(std::string_view id, pugi::xml_node obj)
 
 inline pugi::xml_node getParentObj(pugi::xml_node node)
 {
-    for (auto iter = node.parent(); iter; iter = iter.parent())
+    for (auto iter = node; iter; iter = iter.parent())
         if (iter.attribute("class"))
             return iter;
     return {};
 }
-
-#define getByName(name) find_child_by_attribute("name", name)
 
 inline const char* getObjContextName(pugi::xml_node obj)
 {
@@ -130,4 +122,29 @@ inline std::string printIdVector(std::vector<std::string> ids)
     for (size_t i = 0; i < ids.size(); ++i)
         retval.append(fmt::format("{} {}", ids[i], ((i + 1) % 10) ? "" : "\n"));
     return retval;
+}
+
+inline uint32_t getChildIndex(pugi::xml_node hkobject)
+{
+    uint32_t result = 0;
+    while (hkobject.previous_sibling())
+    {
+        hkobject = hkobject.previous_sibling();
+        ++result;
+    }
+    return result;
+}
+
+inline std::string getParamPath(pugi::xml_node hkparam)
+{
+    std::string retval = "";
+    while (hkparam && !hkparam.attribute("class"))
+    {
+        if (hkparam.attribute("name"))
+            retval = fmt::format("/{}{}", hkparam.attribute("name").as_string(), retval);
+        else
+            retval = fmt::format(":{}{}", getChildIndex(hkparam), retval);
+        hkparam = hkparam.parent();
+    }
+    return {retval.begin() + 1, retval.end()};
 }

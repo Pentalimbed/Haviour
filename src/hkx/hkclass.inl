@@ -39,7 +39,7 @@ constexpr auto e_variableType = std::to_array<std::string_view>(
         "VARIABLE_TYPE_VECTOR4",
         "VARIABLE_TYPE_QUATERNION",
     });
-constexpr VariableTypeEnum getVarTypeEnum(std::string_view enumstr)
+inline VariableTypeEnum getVarTypeEnum(std::string_view enumstr)
 {
     int i = 0;
     for (; i < e_variableType.size(); ++i)
@@ -217,6 +217,39 @@ DEFENUM(f_hkbBlenderGenerator_BlenderFlags)
     {"FLAG_USE_VELOCITY_SYNCHRONIZATION", "Use the velocity-based synchronization", 0x100},
 });
 
+DEFENUM(e_hkbClipGenerator_PlaybackMode)
+({
+    {"MODE_SINGLE_PLAY", "Play the clip once from start to finish."},
+    {"MODE_LOOPING", "Play the clip over and over in a loop."},
+    {"MODE_USER_CONTROLLED",
+     "Don't advance the clip.  Let the user control the local time.\n\n"
+     "In this mode the direction of movement of the clip cursor is from old local time to the new local time.\n"
+     "All the triggers within this interval are processed."},
+    {"MODE_PING_PONG", "At the end of the animation, turn around backward, and then turn around again at the beginning, etc."},
+    {"MODE_COUNT", "How many modes there are."},
+});
+
+DEFENUM(f_hkbClipGenerator_ClipFlags)
+({
+    {"FLAG_CONTINUE_MOTION_AT_END",
+     "In SINGLE_PLAY mode, when the clip gets to the end, it will continue the motion if this is true.\n\n"
+     "If you keep playing a clip beyond the end, it will return the last pose.  This is sometimes useful as you go into a blend.\n"
+     "If this property is false, the motion is just zero after the end of the clip, which means that the animation comes to a halt.\n"
+     "If this property is true, the motion returned after the clip reaches the end will be the motion present at the end of the clip,\n"
+     "so the animation will keep going in the direction it was going.",
+     0x1},
+    {"FLAG_SYNC_HALF_CYCLE_IN_PING_PONG_MODE",
+     "In PING_PONG mode, if this is true, synchronization will be done on half a ping-pong cycle instead of the full cycle (back and forth).\n\n"
+     "Normally in ping-pong mode, the frequency of the clip generator is reported to be half the frequency of the underlying clip.\n"
+     "So for the purpose of synchronization, one cycle of this clip will include playing the clip forward and then backward again to the start.\n"
+     "If you instead want it to synchronize to half of the ping-pong cycle (the animation playing through once, not twice), set this to true.",
+     0x2},
+    {"FLAG_MIRROR", "If this flag is set the pose is mirrored about a plane.", 0x4},
+    {"FLAG_FORCE_DENSE_POSE", "If this flag is set and if the output pose would be a dense pose", 0x8},
+    {"FLAG_DONT_CONVERT_ANNOTATIONS_TO_TRIGGERS", "If this flag is set then we do not convert annotation to triggers.", 0x10},
+    {"FLAG_IGNORE_MOTION", "If this flag is set the motion in the animation will not be extracted.", 0x20},
+});
+
 //////////////////////////    DEFAULT VALUES
 constexpr const char* g_def_hkbVariableInfo =
     R"(<hkobject>
@@ -382,6 +415,81 @@ constexpr const char* g_def_hkbBlenderGeneratorChild =
     <hkparam name="worldFromModelWeight">1.000000</hkparam>
 </hkobject>)";
 
+constexpr const char* g_def_BSBoneSwitchGenerator =
+    R"(<hkobject name="#0602" class="BSBoneSwitchGenerator" signature="0xf33d3eea">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="userData">0</hkparam>
+    <hkparam name="name">BoneSwitch</hkparam>
+    <hkparam name="pDefaultGenerator">null</hkparam>
+    <hkparam name="ChildrenA" numelements="0"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_BSBoneSwitchGeneratorBoneData =
+    R"(<hkobject name="#0000" class="BSBoneSwitchGeneratorBoneData" signature="0xc1215be6">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="pGenerator">null</hkparam>
+    <hkparam name="spBoneWeight">null</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbBoneWeightArray =
+    R"(<hkobject name="#0000" class="hkbBoneWeightArray" signature="0xcd902b77">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="boneWeights" numelements="0"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbClipGenerator =
+    R"(<hkobject name="#0000" class="hkbClipGenerator" signature="0x333b85b9">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="userData">0</hkparam>
+    <hkparam name="name">ClipGenerator</hkparam>
+    <hkparam name="animationName">animation.hkx</hkparam>
+    <hkparam name="triggers">null</hkparam>
+    <hkparam name="cropStartAmountLocalTime">0.000000</hkparam>
+    <hkparam name="cropEndAmountLocalTime">0.000000</hkparam>
+    <hkparam name="startTime">0.000000</hkparam>
+    <hkparam name="playbackSpeed">1.000000</hkparam>
+    <hkparam name="enforcedDuration">0.000000</hkparam>
+    <hkparam name="userControlledTimeFraction">0.000000</hkparam>
+    <hkparam name="animationBindingIndex">-1</hkparam>
+    <hkparam name="mode">MODE_SINGLE_PLAY</hkparam>
+    <hkparam name="flags">0</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbClipTrigger =
+    R"(<hkobject>
+    <hkparam name="localTime">0.000000</hkparam>
+    <hkparam name="event">
+        <hkobject>
+            <hkparam name="id">0</hkparam>
+            <hkparam name="payload">null</hkparam>
+        </hkobject>
+    </hkparam>
+    <hkparam name="relativeToEndOfClip">false</hkparam>
+    <hkparam name="acyclic">false</hkparam>
+    <hkparam name="isAnnotation">false</hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_hkbClipTriggerArray =
+    R"(<hkobject name="#0000" class="hkbClipTriggerArray" signature="0x59c23a0f">
+    <hkparam name="triggers" numelements="0"></hkparam>
+</hkobject>)";
+
+constexpr const char* g_def_BSSynchronizedClipGenerator =
+    R"(<hkobject name="#0365" class="BSSynchronizedClipGenerator" signature="0xd83bea64">
+    <hkparam name="variableBindingSet">null</hkparam>
+    <hkparam name="userData">0</hkparam>
+    <hkparam name="name">SynchronizedClipGenerator</hkparam>
+    <hkparam name="pClipGenerator">null</hkparam>
+    <hkparam name="SyncAnimPrefix">&#9216;</hkparam>
+    <hkparam name="bSyncClipIgnoreMarkPlacement">false</hkparam>
+    <hkparam name="fGetToMarkTime">0.000000</hkparam>
+    <hkparam name="fMarkErrorThreshold">0.100000</hkparam>
+    <hkparam name="bLeadCharacter">false</hkparam>
+    <hkparam name="bReorientSupportChar">false</hkparam>
+    <hkparam name="bApplyMotionFromRoot">false</hkparam>
+    <hkparam name="sAnimationBindingIndex">-1</hkparam>
+</hkobject>)";
+
 inline const std::map<std::string_view, const char*>& getClassDefaultMap()
 {
 #define DEFMAPITEM(hkclass)       \
@@ -398,7 +506,13 @@ inline const std::map<std::string_view, const char*>& getClassDefaultMap()
         DEFMAPITEM(hkbBlendingTransitionEffect),
         DEFMAPITEM(hkbExpressionCondition),
         DEFMAPITEM(hkbBlenderGenerator),
-        DEFMAPITEM(hkbBlenderGeneratorChild)};
+        DEFMAPITEM(hkbBlenderGeneratorChild),
+        DEFMAPITEM(BSBoneSwitchGenerator),
+        DEFMAPITEM(hkbBoneWeightArray),
+        DEFMAPITEM(BSBoneSwitchGeneratorBoneData),
+        DEFMAPITEM(hkbClipGenerator),
+        DEFMAPITEM(hkbClipTriggerArray),
+        DEFMAPITEM(BSSynchronizedClipGenerator)};
     return map;
 }
 

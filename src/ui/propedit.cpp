@@ -130,6 +130,7 @@ void PropEdit::show()
                             edit_obj.remove_children();
                             for (auto child : copied_obj.children())
                                 edit_obj.append_copy(child);
+                            file.buildRefList(m_edit_obj_id);
                         }
                         else
                             spdlog::warn("Copied object either not exist or is of different class.");
@@ -164,6 +165,10 @@ void PropEdit::show()
                         ImGui::SameLine();
                         ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "ESSENTIAL");
                     }
+
+                    ImGui::Separator();
+
+                    ImGui::Text("Editing: %s", hkobj2str(file.getObj(m_edit_obj_id)).c_str());
 
                     ImGui::Separator();
 

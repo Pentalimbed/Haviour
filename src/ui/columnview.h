@@ -11,7 +11,7 @@ namespace Ui
 {
 struct Column
 {
-    std::string m_selected = {};
+    StringSet m_selected;
 };
 
 class ColumnView
