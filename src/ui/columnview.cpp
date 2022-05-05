@@ -23,19 +23,19 @@ ColumnView::ColumnView()
     });
 
     m_class_show = {Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()};
+    m_class_show.insert(Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end());
     m_class_show.emplace("hkbStateMachineStateInfo");
     m_class_show.emplace("hkbBlenderGeneratorChild");
     m_class_show.emplace("BSBoneSwitchGeneratorBoneData");
 
     m_class_color_map["hkbStateMachine"]          = g_color_bool;
     m_class_color_map["hkbStateMachineStateInfo"] = g_color_float;
-    m_class_color_map["hkbBlenderGenerator"] =
-        m_class_color_map["BSBoneSwitchGenerator"] = g_color_int;
+    for (auto gen : Hkx::g_class_generators)
+        m_class_color_map[gen.data()] = g_color_int;
+    for (auto gen : Hkx::g_class_modifiers)
+        m_class_color_map[gen.data()] = g_color_attr;
     m_class_color_map["hkbBlenderGeneratorChild"] =
-        m_class_color_map["BSBoneSwitchGeneratorBoneData"] = g_color_attr;
-    m_class_color_map["hkbClipGenerator"] =
-        m_class_color_map["BSSynchronizedClipGenerator"] =
-            m_class_color_map["hkbBehaviorReferenceGenerator"] = g_color_quad;
+        m_class_color_map["BSBoneSwitchGeneratorBoneData"] = g_color_quad;
 }
 ColumnView::~ColumnView()
 {
@@ -89,8 +89,13 @@ void ColumnView::show()
 
                                     ImGui::PushID(disp_name.c_str());
                                     ImGui::TableNextColumn();
+                                    bool is_editing = PropEdit::getSingleton()->getEditObj() == ref;
+                                    if (is_editing)
+                                        ImGui::BeginDisabled();
                                     if (ImGui::Button(ICON_FA_PEN))
                                         PropEdit::getSingleton()->setObject(ref);
+                                    if (is_editing)
+                                        ImGui::EndDisabled();
                                     addTooltip("Edit");
 
                                     ImGui::TableNextColumn();
@@ -152,7 +157,7 @@ void ColumnView::show()
             }
         }
         else
-            ImGui::TextDisabled("No file loaded.");
+            ImGui::TextDisabled("No loaded file.");
 
         //     ImGui::EndTable();
         // }

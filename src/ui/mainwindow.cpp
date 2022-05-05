@@ -4,6 +4,9 @@
 #include "listview.h"
 #include "propedit.h"
 #include "columnview.h"
+#include "hkx/hkclass.inl"
+
+#include <fstream>
 
 #include <spdlog/spdlog.h>
 #include <nfd.h>
@@ -131,6 +134,29 @@ bool shortcut(ImGuiKeyModFlags mod, ImGuiKey key, bool repeat = true)
     return (mod == ImGui::GetIO().KeyMods) && ImGui::IsKeyPressed(key, repeat);
 }
 
+void newFile()
+{
+    auto        file_manager = Hkx::HkxFileManager::getSingleton();
+    nfdchar_t*  outPath      = nullptr;
+    nfdresult_t result       = NFD_SaveDialog("hkx", nullptr, &outPath);
+    if (result == NFD_OKAY)
+    {
+        std::string path = outPath;
+        if (!path.ends_with(".hkx"))
+            path.append(".hkx");
+        {
+            std::ofstream hkxstream(path);
+            hkxstream << Hkx::g_def_hkx;
+        }
+        file_manager->loadFile(path);
+        free(outPath);
+    }
+    else if (result == NFD_ERROR)
+    {
+        spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
+    }
+}
+
 void openFile()
 {
     auto        file_manager = Hkx::HkxFileManager::getSingleton();
@@ -138,7 +164,7 @@ void openFile()
     nfdresult_t result       = NFD_OpenDialog(nullptr, nullptr, &outPath);
     if (result == NFD_OKAY)
     {
-        file_manager->newFile(outPath);
+        file_manager->loadFile(outPath);
         free(outPath);
     }
     else if (result == NFD_ERROR)
@@ -151,7 +177,7 @@ void saveFileAs()
 {
     auto        file_manager = Hkx::HkxFileManager::getSingleton();
     nfdchar_t*  outPath      = nullptr;
-    nfdresult_t result       = NFD_SaveDialog(nullptr, nullptr, &outPath);
+    nfdresult_t result       = NFD_SaveDialog("hkx", file_manager->getCurrentFile().getPath().data(), &outPath);
     if (result == NFD_OKAY)
     {
         file_manager->saveFile(outPath);
@@ -176,7 +202,8 @@ void showMenuBar()
         if (ImGui::BeginMenu("File"))
         {
             bool dummy_selected = false;
-            if (ImGui::MenuItem("New", "CTRL+N")) {}
+            if (ImGui::MenuItem("New", "CTRL+N"))
+                newFile();
             if (ImGui::MenuItem("Open", "CTRL+O"))
                 openFile();
             if (ImGui::MenuItem("Save", "CTRL+S", &dummy_selected, file_manager->isFileSelected()))
@@ -204,7 +231,7 @@ void showMenuBar()
         }
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Build Reference List") && file_manager->isFileSelected())
+            if (ImGui::MenuItem("Build Reference List", nullptr, file_manager->isFileSelected()))
                 file_manager->getCurrentFile().buildRefList();
             ImGui::EndMenu();
         }

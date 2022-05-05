@@ -16,7 +16,8 @@ public:
 
     bool m_show = true;
 
-    void setObject(std::string_view obj_id);
+    void                    setObject(std::string_view obj_id);
+    inline std::string_view getEditObj() { return m_edit_obj_id; }
 
 private:
     PropEdit();

@@ -1,8 +1,10 @@
 #include "listview.h"
 #include "propedit.h"
 #include "widgets.h"
+#include "hkx/hkclass.inl"
 
 #include <execution>
+#include <ranges>
 
 #include <extern/imgui_stdlib.h>
 #include <extern/font_awesome_5.h>
@@ -73,8 +75,11 @@ void ListView::show()
             addTooltip("Add new object");
             if (ImGui::BeginPopup("Add Class"))
             {
-                for (auto class_name : class_list)
-                    if ((class_name != "All") && ImGui::Selectable(class_name.data()))
+                auto                          temp_view       = Hkx::getClassDefaultMap() | std::views::keys;
+                std::vector<std::string_view> all_avail_class = {temp_view.begin(), temp_view.end()};
+                std::ranges::sort(all_avail_class);
+                for (auto class_name : all_avail_class)
+                    if (ImGui::Selectable(class_name.data()))
                     {
                         PropEdit::getSingleton()->setObject(hkxfile.addObj(class_name));
                         ImGui::CloseCurrentPopup();

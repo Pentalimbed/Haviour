@@ -142,7 +142,7 @@ public:
         return retval;
     }
 
-    void        newFile(std::string_view path);
+    void        loadFile(std::string_view path);
     void        saveFile(std::string_view path = {});
     inline void closeCurrentFile()
     {

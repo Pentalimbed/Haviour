@@ -35,14 +35,14 @@ const auto g_color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
 #define addTooltip(...) \
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
 
-template <typename Prop, typename Manager>
-bool linkedPropPickerPopup(const char* str_id,
-                           Manager&    prop_manager,
-                           Prop&       out)
+template <typename Manager>
+bool linkedPropPickerPopup(const char*              str_id,
+                           Manager&                 prop_manager,
+                           typename Manager::Entry& out)
 {
-    static std::vector<Prop> prop_list_cache;
-    static bool              need_update = true;
-    static std::string       search_text;
+    static std::vector<Manager::Entry> prop_list_cache;
+    static bool                        need_update = true;
+    static std::string                 search_text;
 
     if (need_update)
     {
@@ -54,6 +54,7 @@ bool linkedPropPickerPopup(const char* str_id,
     if (ImGui::BeginPopup(str_id))
     {
         ImGui::InputText("Filter", &search_text);
+        ImGui::SetItemDefaultFocus();
         ImGui::Separator();
 
         auto prop_list = prop_manager.getEntryList();
@@ -76,7 +77,7 @@ bool linkedPropPickerPopup(const char* str_id,
                 {
                     auto prop_disp_name = fmt::format("{:4} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string());
 
-                    if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                    if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
                     {
                         auto var_type      = prop.get<Hkx::PropVarInfo>().getByName("type").text().as_string();
                         auto var_type_enum = Hkx::getVarTypeEnum(var_type);
@@ -97,14 +98,14 @@ bool linkedPropPickerPopup(const char* str_id,
                     if (ImGui::Selectable(prop_disp_name.c_str()))
                     {
                         out = prop;
-                        if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                        if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
                             ImGui::PopStyleColor();
                         ImGui::CloseCurrentPopup();
                         ImGui::EndPopup();
                         return true;
                     }
 
-                    if constexpr (std::is_same_v<Prop, Hkx::Variable>)
+                    if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
                         ImGui::PopStyleColor();
                 }
             }
@@ -193,6 +194,7 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::HkxFile& 
 ////////////////    EDITS
 inline void fullTableSeparator()
 {
+    ImGui::TableNextRow();
     ImGui::TableNextColumn();
     while (ImGui::TableGetColumnIndex() < ImGui::TableGetColumnCount() - 1)
     {
@@ -247,34 +249,37 @@ void intScalarEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, ImGuiDataType dat
 template <size_t N>
 void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {}, bool as_int = false)
 {
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
     stringEdit(hkparam, hint, manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-    flagEditButton("Edit flags", hkparam, flags, as_int);
 
+    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
+    flagEditButton("Edit flags", hkparam, flags, as_int);
     ImGui::PopID();
 }
 
-template <typename Prop, typename Manager>
+template <typename Manager>
 void linkedPropPickerEdit(pugi::xml_node   hkparam,
                           Hkx::HkxFile&    file,
                           Manager&         prop_manager,
                           std::string_view hint        = {},
                           std::string_view manual_name = {})
 {
+    intScalarEdit(hkparam, file, ImGuiDataType_S32, hint, manual_name);
+    if (getParentObj(hkparam).getByName("variableBindingSet"))
+        ImGui::SameLine();
+
     ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
 
-    intScalarEdit(hkparam, file, ImGuiDataType_S32, hint, manual_name);
-
-    Prop out_prop;
+    typename Manager::Entry out_prop;
     if (linkedPropPickerPopup("PickProp", prop_manager, out_prop))
         hkparam.text() = out_prop.m_index;
     if (ImGui::Button(ICON_FA_SEARCH))
         ImGui::OpenPopup("PickProp");
     addTooltip("Select");
-    ImGui::SameLine();
     if (hkparam.text().as_int() >= 0)
+    {
+        ImGui::SameLine();
         ImGui::TextUnformatted(prop_manager.getEntry(hkparam.text().as_ullong()).getName());
+    }
 
     ImGui::PopID();
 }
@@ -297,6 +302,7 @@ void convertFloatEdit(pugi::xml_node   hkparam,
                       std::string_view manual_name = {});
 
 void quadEdit(pugi::xml_node   hkparam,
+              Hkx::HkxFile&    file,
               std::string_view hint        = {},
               std::string_view manual_name = {});
 
@@ -306,7 +312,7 @@ void refEdit(pugi::xml_node                       hkparam,
              std::string_view                     hint        = {},
              std::string_view                     manual_name = {});
 
-void refEdit(std::string&                         value,
+bool refEdit(std::string&                         value,
              const std::vector<std::string_view>& classes,
              pugi::xml_node                       parent,
              Hkx::HkxFile&                        file,
@@ -327,6 +333,14 @@ pugi::xml_node refLiveEditList(
     std::string_view                     hint_attribute = {},
     std::string_view                     name_attribute = {},
     std::string_view                     manual_name    = {});
+
+void objLiveEditList(
+    pugi::xml_node                             hkparam,
+    pugi::xml_node&                            edit_item,
+    const char*                                def_str,
+    Hkx::HkxFile&                              file,
+    std::string_view                           str_id,
+    std::function<std::string(pugi::xml_node)> disp_name_func);
 
 void stateEdit(pugi::xml_node   hkparam,
                Hkx::HkxFile&    file,

@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/details/null_mutex.h>
 #include <imgui.h>
 #include <extern/imgui_notify.h>
@@ -50,6 +51,7 @@ void setupLogger()
     logger->set_pattern("[%H:%M:%S:%e] [%n] [%l] %v");
 
     logger->sinks().push_back(std::make_shared<notify_sink<spdlog::details::null_mutex>>());
+    logger->sinks().push_back(std::make_shared<spdlog::sinks::stderr_color_sink_mt>());
 
     spdlog::set_default_logger(logger);
 }

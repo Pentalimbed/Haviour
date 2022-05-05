@@ -1,3 +1,14 @@
-Rework state and state selection
-Automate variable binding process
+- Rework state and state selection
+- Automate variable binding process
 - Copy/paste ref management
+- Disable unavailable classes options
+- Display all available classes options in list view
+Loading character file
+Bone edit
+Animation edit
+Behaviour diagnosis
+Class hint
+- New file
+Reindex objects
+Navigate to specific object
+Automatic state id distribution

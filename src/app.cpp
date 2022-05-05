@@ -106,6 +106,7 @@ static void loadImGuiFont()
     ImVector<ImWchar>        ranges;
     ImFontGlyphRangesBuilder builder;
     builder.AddRanges(rg_latin_full);
+    builder.AddChar(0x2400); // &#9216;
     builder.BuildRanges(&ranges);
 
     ImFontConfig font_cfg;

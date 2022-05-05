@@ -25,7 +25,7 @@ void HkxFile::loadFile(std::string_view path)
     m_obj_ref_list.clear();
     m_obj_ref_by_list.clear();
 
-    auto result = m_doc.load_file(path.data());
+    auto result = m_doc.load_file(path.data(), pugi::parse_default & (~pugi::parse_escapes));
     if (!result)
     {
         file_logger->error("File parsed with errors.\n\tError description: {}\n\tat location {}", path, result.description(), result.offset);
@@ -124,8 +124,12 @@ void HkxFile::saveFile(std::string_view path)
 
     if (path.empty())
         path = m_path;
+    else
+        m_path = path;
 
-    m_doc.save_file(path.data());
+    spdlog::info("Saving file: {}", path);
+
+    m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes);
 }
 
 void HkxFile::addRef(std::string_view id, std::string_view parent_id)
@@ -280,8 +284,8 @@ static bool isVarNode(pugi::xml_node node)
 {
     auto var_name = node.attribute("name").as_string();
     return (!strcmp(var_name, "variableIndex") && !strcmp(node.parent().getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) ||
-        !strcmp(var_name, "syncVariableIndex") || // hkbStateMachine
-        !strcmp(var_name, "assignmentVariableIndex");
+        !strcmp(var_name, "syncVariableIndex") ||     // hkbStateMachine
+        !strcmp(var_name, "assignmentVariableIndex"); // hkbExpressionData
 }
 
 static bool isEvtNode(pugi::xml_node node)
@@ -293,12 +297,18 @@ static bool isEvtNode(pugi::xml_node node)
     bool is_hkbEvent =
         !strcmp(pp_name, "event") ||
         !strcmp(pp_name, "events") ||
-        !strcmp(pp_name, "eventToSendWhenStateOrTransitionChanges"); // hkbStateMachine
+        !strcmp(pp_name, "triggerEvent") ||                            // BSDistTriggerModifier & BSPassByTargetTriggerModifier
+        !strcmp(pp_name, "contactEvent") ||                            // BSRagdollContactListenerModifier
+        !strcmp(pp_name, "eventToSendWhenStateOrTransitionChanges") || // hkbStateMachine
+        !strcmp(pp_name, "EventToFreezeBlendValue") ||                 // BSCyclicBlendTransitionGenerator
+        !strcmp(pp_name, "EventToCrossBlend") ||
+        !strcmp(pp_name, "alarmEvent") ||    // hkbTimerModifier & BSTimerModifier
+        !strcmp(pp_name, "ungroundedEvent"); // hkbFootIkControlsModifier
 
     return !strcmp(node_name, "eventId") ||   // hkbStateMachineTransitionInfo
         !strcmp(node_name, "enterEventId") || // hkbStateMachineStateInfo/TimeInterval
         !strcmp(node_name, "exitEventId") ||
-        !strcmp(node_name, "assignmentEventIndex") ||
+        !strcmp(node_name, "assignmentEventIndex") ||         // hkbExpressionData
         !strcmp(node_name, "returnToPreviousStateEventId") || // hkbStateMachine
         !strcmp(node_name, "randomTransitionEventId") ||
         !strcmp(node_name, "transitionToNextHigherStateEventId") ||
@@ -396,8 +406,8 @@ void HkxFile::reindexVariables()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isVarNode(node))
-                node.text() = m_remap->at(node.text().as_ullong());
+            if (isVarNode(node) && m_remap->contains(node.text().as_llong()))
+                node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
     } walker;
@@ -414,8 +424,8 @@ void HkxFile::reindexEvents()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isEvtNode(node))
-                node.text() = m_remap->at(node.text().as_ullong());
+            if (isEvtNode(node) && m_remap->contains(node.text().as_llong()))
+                node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
     } walker;
@@ -432,8 +442,8 @@ void HkxFile::reindexProperties()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isPropNode(node))
-                node.text() = m_remap->at(node.text().as_ullong());
+            if (isPropNode(node) && m_remap->contains(node.text().as_llong()))
+                node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
     } walker;
@@ -523,7 +533,7 @@ HkxFileManager* HkxFileManager::getSingleton()
     return std::addressof(manager);
 }
 
-void HkxFileManager::newFile(std::string_view path)
+void HkxFileManager::loadFile(std::string_view path)
 {
     spdlog::info("Loading file: {}", path);
 
@@ -543,8 +553,6 @@ void HkxFileManager::saveFile(std::string_view path)
 {
     if (m_current_file < 0)
         return;
-
-    spdlog::info("Saving file: {}", path);
 
     m_files[m_current_file].saveFile(path);
 }
