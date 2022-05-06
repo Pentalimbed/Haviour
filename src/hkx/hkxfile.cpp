@@ -1,6 +1,5 @@
 #include "hkxfile.h"
 #include "hkclass.inl"
-#include "hkutils.h"
 
 #include <memory>
 #include <execution>
@@ -169,21 +168,8 @@ void HkxFile::buildRefList()
         m_obj_ref_list[obj.attribute("name").as_string()]    = {};
     }
 
-    std::for_each(
-        std::execution::par,
-        m_obj_list.begin(), m_obj_list.end(),
-        [=](auto entry) {
-            std::string_view id = entry.second.attribute("name").as_string();
-            for (auto& [parent_id, parent_obj] : m_obj_list)
-            {
-                if (id != parent_id && isRefBy(id, parent_obj))
-                    if (getObj(id) && getObj(parent_id))
-                        m_obj_ref_by_list.find(id)->second.emplace(parent_id);
-            }
-        }); // try to be fast here
-    for (auto& [id, ref_by] : m_obj_ref_by_list)
-        for (auto parent : ref_by)
-            m_obj_ref_list.find(parent)->second.emplace(id);
+    for (auto& [id, obj] : m_obj_list)
+        buildRefList(id);
 }
 void HkxFile::buildRefList(std::string_view id)
 {
@@ -194,9 +180,32 @@ void HkxFile::buildRefList(std::string_view id)
     for (auto ref_obj_id : refed_objs)
         deRef(ref_obj_id, id);
 
-    for (auto& [ref_id, ref_obj] : m_obj_list)
-        if (id != ref_id && isRefBy(ref_id, obj))
-            addRef(ref_id, id);
+    struct Walker : pugi::xml_tree_walker
+    {
+        StringSet* m_refs;
+
+        virtual bool for_each(pugi::xml_node& node)
+        {
+            if (node.type() == pugi::node_pcdata)
+            {
+                std::string text = node.value();
+                size_t      pos  = text.find('#');
+                while (pos != text.npos)
+                {
+                    if (!pos || (text[pos - 1] != '&')) // in case html entity, fuck html entities
+                        m_refs->emplace(&text[pos], 5);
+                    pos = text.find('#', pos + 1);
+                }
+                node.text() = text.c_str();
+            }
+            return true; // continue traversal
+        }
+    } walker;
+    walker.m_refs = &m_obj_ref_list.find(id)->second;
+    obj.traverse(walker);
+
+    for (auto& refed_id : *walker.m_refs)
+        m_obj_ref_by_list.find(refed_id)->second.emplace(id);
 }
 
 std::string_view HkxFile::addObj(std::string_view hkclass)
@@ -211,11 +220,11 @@ std::string_view HkxFile::addObj(std::string_view hkclass)
     auto& class_def_map = getClassDefaultMap();
     if (class_def_map.contains(hkclass))
     {
-        auto retval              = appendXmlString(m_data_node, class_def_map.at(hkclass));
-        auto id_str              = std::format("#{:04}", ++m_latest_id);
-        retval.attribute("name") = id_str.c_str();
+        auto new_obj              = appendXmlString(m_data_node, class_def_map.at(hkclass));
+        auto id_str               = std::format("#{:04}", ++m_latest_id);
+        new_obj.attribute("name") = id_str.c_str();
 
-        m_obj_list[id_str] = retval;
+        m_obj_list[id_str] = new_obj;
         if (!m_obj_class_list.contains(hkclass))
             m_obj_class_list[std::string(hkclass)] = {};
         m_obj_class_list.find(hkclass)->second.push_back(id_str);

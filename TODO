@@ -1,14 +1,17 @@
-- Rework state and state selection
-- Automate variable binding process
-- Copy/paste ref management
-- Disable unavailable classes options
-- Display all available classes options in list view
+- 0.1a Rework state and state selection
+- 0.1a Automate variable binding process
+- 0.1a Copy/paste ref management
+- 0.1a Disable unavailable classes options
+- 0.1a Display all available classes options in list view
 Loading character file
+Editing character file
 Bone edit
 Animation edit
 Behaviour diagnosis
-- Class hint
-- New file
-- Reindex objects
-Navigate to specific object in column view
-Automatic state id distribution
+- 0.2a Class hint
+- 0.1a New file
+- 0.2a Reindex objects
+- 0.2a Navigate to specific object in column view
+- 0.2a Automatic state id distribution
+Bone weight/index array
+- 0.2a Opitimize buildRefList

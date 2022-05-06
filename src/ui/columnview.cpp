@@ -2,8 +2,11 @@
 #include "widgets.h"
 #include "propedit.h"
 #include "hkx/hkclass.inl"
+#include "hkx/hkutils.h"
 
 #include <memory>
+
+#include <spdlog/spdlog.h>
 
 namespace Haviour
 {
@@ -50,19 +53,29 @@ void ColumnView::show()
     auto file_manager = Hkx::HkxFileManager::getSingleton();
     if (ImGui::Begin("Column View", &m_show, ImGuiWindowFlags_HorizontalScrollbar))
     {
-        // if (ImGui::BeginTable("colviewtable", 2, ImGuiTableFlags_Resizable))
-        // {
-        // settings
-        // ImGui::TableNextColumn();
-        ImGui::TextDisabled("placeholder text");
-        ImGui::Separator();
-
-        // columns
-        // ImGui::TableNextColumn();
         if (file_manager->isFileSelected())
         {
             auto&       file               = file_manager->getCurrentFile();
             std::string root_state_machine = file.getRootStateMachine().data();
+
+            if (ImGui::InputText("Navigate to object", &m_nav_edit_str, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                spdlog::info("Navigating to {}", m_nav_edit_str);
+                std::vector<std::string> path = {};
+                getNavPath(m_nav_edit_str, root_state_machine, file, path);
+                if (!path.empty())
+                {
+                    if (m_columns.size() < path.size())
+                        m_columns.resize(path.size());
+                    for (int i = 0; i < path.size(); ++i)
+                        m_columns[i].m_selected.insert(path[i].data());
+                }
+                else
+                    spdlog::warn("Failed to navigate to {}", m_nav_edit_str);
+            }
+            addTooltip("Press enter to navigate.");
+            ImGui::Separator();
+
             if (root_state_machine.empty() || !file.getObj(root_state_machine))
                 ImGui::TextDisabled("Failed to get root generator object");
             else
@@ -140,6 +153,8 @@ void ColumnView::show()
 
                             reflist.push_back("> " + disp_name);
                             file.getRefedObjs(ref, reflist);
+                            if (reflist.back() == "> " + disp_name)
+                                reflist.pop_back(); // empty ones don't get shown
                         }
 
                     if (reflist.empty())

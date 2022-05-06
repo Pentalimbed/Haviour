@@ -85,7 +85,7 @@ void VarEdit::showVarList()
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_FILTER))
         current_file.cleanupVariables();
-    addTooltip("Remove unused variables");
+    addTooltip("Remove unused variables (USE WITH CAUTION!)");
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
         current_file.reindexVariables();
@@ -191,7 +191,7 @@ void VarEdit::showEvtList()
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_FILTER))
         current_file.cleanupEvents();
-    addTooltip("Remove unused events");
+    addTooltip("Remove unused events (USE WITH CAUTION!)");
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
         current_file.reindexEvents();
@@ -271,7 +271,7 @@ void VarEdit::showPropList()
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_FILTER))
         current_file.cleanupProps();
-    addTooltip("Remove unused properties");
+    addTooltip("Remove unused properties (USE WITH CAUTION!)");
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
         current_file.reindexProperties();

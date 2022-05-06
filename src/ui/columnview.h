@@ -31,6 +31,8 @@ private:
 
     StringSet          m_class_show;
     StringMap<ImColor> m_class_color_map;
+
+    std::string m_nav_edit_str;
 };
 } // namespace Ui
 } // namespace Haviour

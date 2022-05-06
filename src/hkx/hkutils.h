@@ -4,6 +4,8 @@
 #include "hkxfile.h"
 #include "utils.h"
 
+#include <stack>
+
 namespace Haviour
 {
 inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::HkxFile& file)
@@ -43,6 +45,68 @@ inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_i
             return state;
     }
     return {};
+}
+
+inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::HkxFile& file)
+{
+    if (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
+        return -1;
+
+    auto               states_node = state_machine.getByName("states");
+    size_t             num_objs    = states_node.attribute("numelements").as_ullong();
+    std::istringstream states_stream(states_node.text().as_string());
+    auto               max_id = -1;
+
+    for (size_t i = 0; i < num_objs; ++i)
+    {
+        std::string temp_str;
+        states_stream >> temp_str;
+
+        auto state = file.getObj(temp_str);
+        auto id    = state.getByName("stateId").text().as_int();
+
+        max_id = std::max(max_id, id);
+    }
+    return max_id;
+}
+
+// get a path from a child to parent
+// the return starts(idx=0) from parent to child
+inline void getNavPath(const std::string& from, const std::string& to, Hkx::HkxFile& file, std::vector<std::string>& out)
+{
+    StringMap<std::string>  prev_obj;
+    std::stack<std::string> objs_to_check;
+
+    // DFS
+    objs_to_check.push(from);
+    prev_obj[from] = {};
+    while (!objs_to_check.empty())
+    {
+        auto top = objs_to_check.top();
+        objs_to_check.pop();
+
+        if (top == to)
+        {
+            out       = {to};
+            auto prev = prev_obj[to];
+            while (!prev.empty())
+            {
+                out.push_back(prev);
+                prev = prev_obj[prev];
+            }
+        }
+
+        std::vector<std::string> obj_refs = {};
+        file.getObjRefs(top, obj_refs);
+        for (auto& ref : obj_refs)
+        {
+            if (!prev_obj.contains(ref))
+            {
+                objs_to_check.push(ref);
+                prev_obj[ref] = top;
+            }
+        }
+    }
 }
 
 } // namespace Haviour

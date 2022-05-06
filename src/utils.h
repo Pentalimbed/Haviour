@@ -3,6 +3,7 @@
 #include <string>
 #include <tuple>
 #include <functional>
+#include <strstream>
 
 #include <robin_hood.h>
 #include <pugixml.hpp>
@@ -77,7 +78,7 @@ inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view sr
 {
     // parse XML string as document
     pugi::xml_document doc;
-    if (!doc.load_buffer(srcString.data(), srcString.length()))
+    if (!doc.load_buffer(srcString.data(), srcString.length(), pugi::parse_default & (~pugi::parse_escapes)))
         return {};
 
     if (target.attribute("numelements"))
@@ -89,7 +90,7 @@ inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view sr
 
 inline bool isRefBy(std::string_view id, pugi::xml_node obj)
 {
-    return obj.find_node([=](pugi::xml_node node) { return std::string_view(node.text().as_string()).contains(id); });
+    return obj.find_node([=](pugi::xml_node node) { return (node.type() == pugi::node_pcdata) && std::string_view(node.value()).contains(id); });
 }
 
 inline pugi::xml_node getParentObj(pugi::xml_node node)

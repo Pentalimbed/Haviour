@@ -168,7 +168,9 @@ void PropEdit::show()
 
                     ImGui::Separator();
 
-                    ImGui::Text("Editing: %s", hkobj2str(file.getObj(m_edit_obj_id)).c_str());
+                    ImGui::Text("Editing: %s", hkobj2str(edit_obj).c_str());
+                    if (auto class_info = Hkx::getClassInfo(); class_info.contains(edit_obj.attribute("class").as_string()))
+                        addTooltip(class_info.at(edit_obj.attribute("class").as_string()).data());
 
                     ImGui::Separator();
 
