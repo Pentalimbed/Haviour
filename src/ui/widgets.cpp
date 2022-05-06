@@ -352,6 +352,7 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
     ImGui::SameLine();
     if (ImGui::BeginPopup("Append"))
     {
+        auto& class_info = Hkx::getClassInfo();
         for (auto class_name : classes)
         {
             if (!Hkx::getClassDefaultMap().contains(class_name))
@@ -369,6 +370,8 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
             }
             if (!Hkx::getClassDefaultMap().contains(class_name))
                 ImGui::EndDisabled();
+            if (class_info.contains(class_name))
+                addTooltip(class_info.at(class_name).data())
         }
 
         ImGui::EndPopup();
@@ -416,6 +419,7 @@ bool refEdit(std::string&                         value,
     ImGui::SameLine();
     if (ImGui::BeginPopup("Append"))
     {
+        auto& class_info = Hkx::getClassInfo();
         for (auto class_name : classes)
         {
             if (!Hkx::getClassDefaultMap().contains(class_name))
@@ -429,6 +433,8 @@ bool refEdit(std::string&                         value,
             }
             if (!Hkx::getClassDefaultMap().contains(class_name))
                 ImGui::EndDisabled();
+            if (class_info.contains(class_name))
+                addTooltip(class_info.at(class_name).data());
         }
         ImGui::EndPopup();
     }

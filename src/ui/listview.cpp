@@ -75,16 +75,21 @@ void ListView::show()
             addTooltip("Add new object");
             if (ImGui::BeginPopup("Add Class"))
             {
+                auto&                         class_info      = Hkx::getClassInfo();
                 auto                          temp_view       = Hkx::getClassDefaultMap() | std::views::keys;
                 std::vector<std::string_view> all_avail_class = {temp_view.begin(), temp_view.end()};
                 std::ranges::sort(all_avail_class);
                 for (auto class_name : all_avail_class)
+                {
                     if (ImGui::Selectable(class_name.data()))
                     {
                         PropEdit::getSingleton()->setObject(hkxfile.addObj(class_name));
                         ImGui::CloseCurrentPopup();
                         break;
                     }
+                    if (class_info.contains(class_name))
+                        addTooltip(class_info.at(class_name).data());
+                }
                 ImGui::EndPopup();
             }
 

@@ -1295,7 +1295,7 @@ constexpr const char* g_def_BSGetTimeStepModifier =
     R"(<hkobject name="#0000" class="BSGetTimeStepModifier" signature="0xbda33bfe">
     <hkparam name="variableBindingSet">null</hkparam>
     <hkparam name="userData">0</hkparam>
-    <hkparam name="name">GetTimeStepModifier1</hkparam>
+    <hkparam name="name">GetTimeStepModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="timeStep">0.000000</hkparam>
 </hkobject>)";
@@ -1623,6 +1623,121 @@ constexpr auto g_class_modifiers = std::to_array<std::string_view>(
 
 //////////////////////////    CLASS INFO
 
+inline const std::map<std::string_view, std::string_view>& getClassInfo()
+{
+    static const std::map<std::string_view, std::string_view> map = {
+        {"hkbVariableBindingSet", "A set of bindings from variables to object properties."},
+        {"hkbStateMachine",
+         "A state machine that transitions between generators.\n\n"
+         "An hkbStateMachine organizes a set of states, each of which has an hkbGenerator. The state machine is itself an hkbGenerator.\n"
+         "When not in a transition, it simply generates a pose by calling the generator corresponding to the current state.\n"
+         "During a transition, it generates poses using an hkbTransitionEffect to generate the pose\n"
+         "(typically by blending the generator being transitioned from with the one being transitioned to)."},
+        {"hkbStateMachineStateInfo", "Information regarding a state of the state machine."},
+        {"hkbStringEventPayload", "An event payload that contains a string."},
+        {"hkbStateMachineTransitionInfoArray",
+         "An array of TransitionInfos wrapped for shared access.\n\n"
+         "A TransitionInfo stores information regarding a transition between states."},
+        {"hkbBlendingTransitionEffect", "A transition effect that does a linear blend between two generators."},
+        {"hkbExpressionCondition", "A condition that is described by an expression string."},
+        {"hkbBlenderGenerator",
+         "A generator which performs a blend between an arbitrary number of children.\n\n"
+         "Each child has a blend weight between 0 and 1. Each child can also have a blend weight for each bone.\n"
+         "The two weights are multiplied to get the per-child per-bone weight. For each bone, the weights across all of the children are normalized to sum to 1.\n"
+         "If the sum of the weights falls below the threshold specified in m_referencePoseWeightThreshold, the reference pose is blended in.\n\n"
+         "When the FLAG_PARAMETRIC_BLEND flag is set the blender generator works as a parametric blender.\n"
+         "The parametric blend can be cyclic or acyclic. Cyclic and acyclic differs in the way the boundary conditions are handled.\n\n"
+         "During a parametric blend the child generator weights represents the sample points on a line.\n"
+         "Based on the value of m_blendParameter an interval is computed such that the parametric blend lies within this interval\n"
+         "and the animations that bound the interval are blended. There can be multiple animations with the same weight.\n"
+         "If that happens then we have a convention the interval is chosen such that the highest child generator index bounds it on the left side.\n\n"
+         "In case of a acyclic parametric blend\n"
+         "whenever the value of m_blendParameter is less than the value of first child then the interval between the first and second child is chosen\n"
+         "and when it is greater then the value of its last child then the interval between the second last child and the last child is chosen.\n"
+         "The same thing happens in cyclic mode when the first child weight is equal to the m_minBlendParameter and the last child weight is equal to m_maxBlendParameter.\n"
+         "If that is not the case then when the m_blendParameter goes beyond the first child and m_minBlendParameter is less than the first child weight\n"
+         "or m_blendParameter goes beyond the last child weight and m_maxBlendParameter is greater than the last child weight\n"
+         "the interval is between the first and the last children."},
+        {"hkbBlenderGeneratorChild", "An internal class representing the child of an hkbBlenderGenerator."},
+        {"hkbBoneWeightArray", "An array of bone weights used when blending."},
+        {"hkbBoneIndexArray", "An array of bone indices that can be bound to behavior variables and character properties."},
+        {"hkbClipGenerator", "Generates an animation clip."},
+        {"hkbClipTriggerArray",
+         "An array of triggers wrapped for shared access.\n\n"
+         "A trigger is an event that is attached to the local timeline of an hkbClipGenerator.\n"
+         "When the clip passes the time of a trigger, the event associated with the trigger is sent."},
+        {"hkbManualSelectorGenerator", "An example custom generator for selecting among a set of child generators."},
+        {"hkbModifierGenerator",
+         "A generator that wraps another generator and applies a modifier to the results.\n\n"
+         "When a method of hkbModifierGenerator is called, it first calls the same method on the child generator.\n"
+         "It then calls the analogous method on the stored modifier."},
+        {"hkbBehaviorReferenceGenerator",
+         "This generator is a wrapper for an hkbBehaviorGraph.\n"
+         "It does not save the behavior when serialized. Only the name is saved.\n"
+         "The convention is that the user must provide a behavior at runtime, using the name to identify which behavior to use.\n\n"
+         "You need to make sure to go through the linking process\n"
+         "so that the referencing behavior graph and the referenced behavior graph can communicate events, attributes, and variables.\n"
+         "See hkbBehaviorLinkingUtils::linkBehavior() and hkbBehaviorLinkingUtils::linkBehaviors()."},
+        {"hkbPoseMatchingGenerator",
+         "Matches the ragdoll to the first pose of each of the child generators.\n\n"
+         "This generator has two modes.\n"
+         "In MODE_MATCH, the current ragdoll pose is matched with the first pose of each of the child generators.\n"
+         "The best matching pose is produced as output (gradually).\n"
+         "When a new child is chosen to have the best matching pose, that child is blended in over time and the other children are blended out.\n"
+         "In MODE_PLAY, the best matching child is played."},
+        {"hkbModifierList",
+         "Applies a sequence of modifiers as a single modifier.\n\n"
+         "This class is especially useful if a behavior graph shares a sequence of modifiers among several branches.\n"
+         "You can create the sequence once and then just add it to each branch instead of having to add all of the modifiers individually."},
+        {"hkbEvaluateExpressionModifier", "A modifier for evaluating expressions."},
+        {"hkbExpressionDataArray", "An array of expressions wrapped for shared access."},
+        {"hkbEventDrivenModifier", "A modifier that activates/deactivates its child modifier on receiving events"},
+        {"hkbEventsFromRangeModifier", "A modifier for firing events, given a variable mapped onto a set of ranges."},
+        {"hkbEventRangeDataArray", "An array of expressions wrapped for shared access."},
+        {"hkbGetUpModifier",
+         "Gradually aligns the up-vector of the character's world-from-model transform with the world up-vector.\n"
+         "This is useful when the character is getting up after having been a ragdoll.\n"
+         "When using the hkbPoweredRagdollModifier the world-from-model of the character is typically allowed to rotate freely.\n"
+         "But when you want the character to stand up again, the world-from-model needs to be realigned with the world so that the character stands up straight."},
+        {"hkbKeyframeBonesModifier",
+         "This modifier allows you to specify which bones are keyframed. One float per bone is placed into the track data.\n"
+         "This data is passed through the behavior graph and can be blended by blend nodes and during transitions.\n"
+         "The track data is used by hkbPoweredRagdollModifier and hkbRigidBodyRagdollModifier to decide which bones should be keyframed."},
+        {"hkbPoweredRagdollControlsModifier",
+         "Produces control data used by hkbPoweredRagdollModifier and puts it into the tracks of the output when modify() is called.\n"
+         "This data is passed through the behavior tree and can be blended by blend nodes and during transitions."},
+        {"hkbRigidBodyRagdollControlsModifier",
+         "Produces control data used by hkbRigidBodyRagdollModifier and puts it into the tracks of the output when modify() is called.\n"
+         "This data is passed through the behavior tree and can be blended by blend nodes and during transitions."},
+        {"hkbRotateCharacterModifier", "A modifier that rotates the character worldFromModel in response to events."},
+        {"hkbTimerModifier", "A modifier for sending an event after a time lapse."},
+        {"hkbFootIkControlsModifier",
+         "Places foot IK control data into the track data to be blended in a behavior graph.\n\n"
+         "The control data is consumed by the hkbFootIkModifier, which should be placed rootward of this node in the behavior graph."},
+        {"hkbTwistModifier", "A modifier to twist a chain of bones (such as the spine of the character) around a given axis."},
+        {"hkbCombineTransformsModifier",
+         "This modifier multiplies two input transforms and produces an output transform.\n"
+         "The inputs and outputs are in the form of a translation vector and a quaternion.\n"
+         "You can optionally request inversion of the inputs and output."},
+        {"hkbComputeDirectionModifier", "Given an input point, this modifier outputs the point in the character's coordinate frame, and also a vertical angle and ground angle."},
+        {"hkbComputeRotationFromAxisAngleModifier", "This modifier converts an axis and angle into a quaternion."},
+        {"hkbComputeRotationToTargetModifier", "Computes the rotation about a given axis that will face an object toward a given target."},
+        {"hkbDampingModifier", "This is a modifier that uses a PID controller to provide variable damping."},
+        {"hkbDelayedModifier", "A modifier that applies another modifier after a delay, and optionally for a finite duration."},
+        {"hkbDetectCloseToGroundModifier", "A modifier that sends an event when the character is close to the ground."},
+        {"hkbExtractRagdollPoseModifier", "This modifier allows you to extract the current pose of the ragdoll"},
+        {"hkbGetWorldFromModelModifier", "A modifier that gets the worldFromModel."},
+        {"hkbLookAtModifier", "A modifier that looks at a target point."},
+        {"hkbMirrorModifier", "This simply mirrors the animation"},
+        {"hkbMoveCharacterModifier", "A modifier that moves the character position by a constant offset per unit time."},
+        {"hkbTransformVectorModifier", "Transforms a given vector by a given matrix."},
+        {"hkbStateMachineEventPropertyArray",
+         "An array of EventProperties wrapped for shared access.\n\n"
+         "An EventProperty is an event that is used as a node property.\n"
+         "It differs from hkbEvent in that the payload is reference counted and it doesn't have a sender."},
+    };
+    return map;
+}
 
 } // namespace Hkx
 } // namespace Haviour

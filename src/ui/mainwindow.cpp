@@ -231,8 +231,10 @@ void showMenuBar()
         }
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Build Reference List", nullptr, file_manager->isFileSelected()))
+            if (ImGui::MenuItem("Build Reference List", nullptr, false, file_manager->isFileSelected()))
                 file_manager->getCurrentFile().buildRefList();
+            if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->isFileSelected()))
+                file_manager->getCurrentFile().reindexObj();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))

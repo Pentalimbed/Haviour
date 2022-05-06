@@ -72,6 +72,10 @@ public:
             out.push_back(pair.first);
         std::ranges::sort(out);
     }
+    inline std::string_view getRootStateMachine()
+    {
+        return m_graph_obj.getByName("rootGenerator").text().as_string();
+    }
 
     inline bool isObjEssential(std::string_view id)
     {
@@ -79,12 +83,9 @@ public:
         return std::ranges::find(essential_obj, getObj(id)) != essential_obj.end();
     }
 
-    std::string_view        addObj(std::string_view hkclass);
-    void                    delObj(std::string_view id);
-    inline std::string_view getRootStateMachine()
-    {
-        return m_graph_obj.getByName("rootGenerator").text().as_string();
-    }
+    std::string_view addObj(std::string_view hkclass);
+    void             delObj(std::string_view id);
+    void             reindexObj(uint16_t start_id = 100);
 
     AnimationEventManager    m_evt_manager;
     VariableManager          m_var_manager;

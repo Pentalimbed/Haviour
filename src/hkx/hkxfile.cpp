@@ -201,7 +201,7 @@ void HkxFile::buildRefList(std::string_view id)
 
 std::string_view HkxFile::addObj(std::string_view hkclass)
 {
-    spdlog::info("Attempting to add new {}", hkclass);
+    spdlog::info("Attempting to add new {} ...", hkclass);
     if (m_latest_id >= 9999)
     {
         spdlog::warn("Exceeding object id limit (9999). Consider doing some cleaning or making a separate file for one of the branches.");
@@ -234,7 +234,7 @@ std::string_view HkxFile::addObj(std::string_view hkclass)
 }
 void HkxFile::delObj(std::string_view id)
 {
-    spdlog::info("Attempting to delete object {}", id);
+    spdlog::info("Attempting to delete object {} ...", id);
 
     auto obj = getObj(id);
     if (!obj)
@@ -275,6 +275,97 @@ void HkxFile::delObj(std::string_view id)
     m_obj_ref_list.erase(m_obj_ref_list.find(id));
 
     spdlog::info("Object {} deleted.", id);
+    HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
+}
+
+void HkxFile::reindexObj(uint16_t start_id)
+{
+    spdlog::info("Attempting to reindex all objects...");
+
+    // get the id map
+    StringMap<std::string> remap = {};
+
+    auto new_idx = start_id;
+    for (uint16_t i = 0; i <= m_latest_id; ++i)
+        if (auto old_id_str = fmt::format("#{:04}", i); m_obj_list.contains(old_id_str))
+        {
+            remap[old_id_str] = fmt::format("#{:04}", new_idx);
+            ++new_idx;
+        }
+    m_latest_id = new_idx - 1;
+
+    // remap the lists
+    {
+        decltype(m_obj_list) new_list = {};
+        for (auto& [key, val] : m_obj_list)
+            new_list[remap[key]] = val;
+        m_obj_list = new_list;
+    }
+    {
+        decltype(m_obj_class_list) new_list = {};
+        for (auto& [key, val] : m_obj_class_list)
+            new_list[key] = {};
+        std::for_each(std::execution::par,
+                      m_obj_class_list.begin(), m_obj_class_list.end(),
+                      [&](auto& pair) {
+                          std::ranges::transform(pair.second, std::back_inserter(new_list[pair.first]), [&](const std::string& item) { return remap[item]; });
+                      });
+        m_obj_class_list = new_list;
+    }
+    {
+        decltype(m_obj_ref_by_list) new_list = {};
+        for (auto& [key, val] : m_obj_ref_by_list)
+            new_list[remap[key]] = {};
+        std::for_each(std::execution::par,
+                      m_obj_ref_by_list.begin(), m_obj_ref_by_list.end(),
+                      [&](auto& pair) {
+                          auto& new_set = new_list[remap[pair.first]];
+                          std::ranges::transform(pair.second, std::inserter(new_set, new_set.end()), [&](const std::string& item) { return remap[item]; });
+                      });
+        m_obj_ref_by_list = new_list;
+    }
+    {
+        decltype(m_obj_ref_list) new_list = {};
+        for (auto& [key, val] : m_obj_ref_list)
+            new_list[remap[key]] = {};
+        std::for_each(std::execution::par,
+                      m_obj_ref_list.begin(), m_obj_ref_list.end(),
+                      [&](auto& pair) {
+                          auto& new_set = new_list[remap[pair.first]];
+                          std::ranges::transform(pair.second, std::inserter(new_set, new_set.end()), [&](const std::string& item) { return remap[item]; });
+                      });
+        m_obj_ref_list = new_list;
+    }
+
+    // remap the xml
+    struct Walker : pugi::xml_tree_walker
+    {
+        StringMap<std::string>* m_remap;
+
+        virtual bool for_each(pugi::xml_node& node)
+        {
+            if (node.type() == pugi::node_pcdata)
+            {
+                std::string text = node.value();
+                size_t      pos  = text.find('#');
+                while (pos != text.npos)
+                {
+                    if (!pos || (text[pos - 1] != '&')) // in case html entity, fuck html entities
+                        text.replace(pos, 5, m_remap->at(std::string(&text[pos], 5)));
+                    pos = text.find('#', pos + 1);
+                }
+                node.text() = text.c_str();
+            }
+            return true; // continue traversal
+        }
+    } walker;
+    walker.m_remap = &remap;
+    m_data_node.traverse(walker);
+
+    for (auto [key, obj] : m_obj_list)
+        obj.attribute("name") = key.c_str();
+
+    spdlog::info("All objects reindexed.");
     HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
 
@@ -406,7 +497,7 @@ void HkxFile::reindexVariables()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isVarNode(node) && m_remap->contains(node.text().as_llong()))
+            if ((node.type() == pugi::node_element) && isVarNode(node) && m_remap->contains(node.text().as_llong()))
                 node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
@@ -424,7 +515,7 @@ void HkxFile::reindexEvents()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isEvtNode(node) && m_remap->contains(node.text().as_llong()))
+            if ((node.type() == pugi::node_element) && isEvtNode(node) && m_remap->contains(node.text().as_llong()))
                 node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
@@ -442,7 +533,7 @@ void HkxFile::reindexProperties()
 
         virtual bool for_each(pugi::xml_node& node)
         {
-            if (isPropNode(node) && m_remap->contains(node.text().as_llong()))
+            if ((node.type() == pugi::node_element) && isPropNode(node) && m_remap->contains(node.text().as_llong()))
                 node.text() = m_remap->at(node.text().as_llong());
             return true; // continue traversal
         }
