@@ -3,7 +3,6 @@
 #include <string>
 #include <tuple>
 #include <functional>
-#include <strstream>
 
 #include <robin_hood.h>
 #include <pugixml.hpp>

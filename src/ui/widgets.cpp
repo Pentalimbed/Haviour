@@ -329,8 +329,8 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
     if (ImGui::InputText(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
     {
         edited = true;
-        if (auto obj = file.getObj(value))                                                                         // Is obj
-            if (std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) != classes.end()) // Same class
+        if (auto obj = file.getObj(value); obj)                                                                                        // Is obj
+            if (!classes.empty() && std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) != classes.end()) // Same class
                 hkparam.text() = value.c_str();
             else
                 hkparam.text() = "null";
@@ -455,11 +455,13 @@ bool refEdit(std::string&                         value,
     if (ImGui::InputText(manual_name.data(), &value))
     {
         edited = true;
-        if (auto obj = file.getObj(value))                                                                         // Is obj
-            if (std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) == classes.end()) // Different class
+        if (auto obj = file.getObj(value); obj) // Is obj
+        {
+            if (!classes.empty() && std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) == classes.end()) // Different class
                 value = "null";
-            else
-                value = "null";
+        }
+        else
+            value = "null";
     }
     if (!hint.empty())
         addTooltip(hint.data());
@@ -577,7 +579,7 @@ pugi::xml_node refLiveEditList(
     constexpr auto table_flag = ImGuiTableFlags_SizingFixedFit |
         ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
-    if (ImGui::BeginTable("states", 2, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
+    if (ImGui::BeginTable("states", 3, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
     {
         size_t mark_delete = UINT64_MAX;
         bool   do_delete   = false;
@@ -586,18 +588,8 @@ pugi::xml_node refLiveEditList(
             auto obj = Hkx::HkxFileManager::getSingleton()->getCurrentFile().getObj(objs[i]);
 
             ImGui::PushID(i);
-            ImGui::SetNextItemWidth(60);
-            refEdit(objs[i], classes, parent, file,
-                    obj.getByName(hint_attribute.data()).text().as_string(),
-                    obj.getByName(name_attribute.data()).text().as_string());
-            ImGui::SameLine();
-            if (ImGui::Button(ICON_FA_MINUS_CIRCLE))
-            {
-                do_delete   = true;
-                mark_delete = i;
-            }
-            addTooltip("Remove");
-            ImGui::SameLine();
+
+            ImGui::TableNextColumn();
             if (ImGui::Button(ICON_FA_PEN))
             {
                 ImGui::PopID();
@@ -605,6 +597,15 @@ pugi::xml_node refLiveEditList(
                 return obj;
             }
             addTooltip("Edit here");
+
+            if (refEdit(objs[i], classes, parent, file,
+                        obj.getByName(hint_attribute.data()).text().as_string(),
+                        obj.getByName(name_attribute.data()).text().as_string()))
+            {
+                do_delete   = true;
+                mark_delete = i;
+            }
+
             ImGui::PopID();
         }
         if (do_delete)
@@ -737,7 +738,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
                     break;
                 case Hkx::VARIABLE_TYPE_POINTER:
                     ImGui::TableNextColumn();
-                    ImGui::TextDisabled("Currently not supported");
+                    ImGui::InputText("value", &file.m_var_manager.getPointerValue(var_value_node.text().as_uint()));
                     ImGui::TableNextColumn();
                     break;
                 case Hkx::VARIABLE_TYPE_VECTOR3:

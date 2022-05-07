@@ -89,6 +89,7 @@ void HkxFile::loadFile(std::string_view path)
     auto var_name_node  = m_graph_str_data_obj.getByName("variableNames");
     auto var_value_node = m_var_value_obj.getByName("wordVariableValues");
     auto var_quad_node  = m_var_value_obj.getByName("quadVariableValues");
+    auto var_ptr_node   = m_var_value_obj.getByName("variantVariableValues");
 
     auto evt_info_node = m_graph_data_obj.getByName("eventInfos");
     auto evt_name_node = m_graph_str_data_obj.getByName("eventNames");
@@ -96,7 +97,7 @@ void HkxFile::loadFile(std::string_view path)
     auto prop_info_node = m_graph_data_obj.getByName("characterPropertyInfos");
     auto prop_name_node = m_graph_str_data_obj.getByName("characterPropertyNames");
 
-    if (!(var_info_node && var_name_node && var_value_node && var_quad_node &&
+    if (!(var_info_node && var_name_node && var_value_node && var_quad_node && var_ptr_node &&
           evt_info_node && evt_name_node &&
           prop_info_node && prop_name_node))
     {
@@ -104,7 +105,7 @@ void HkxFile::loadFile(std::string_view path)
         return;
     }
 
-    m_var_manager.buildEntryList(var_name_node, var_info_node, var_value_node, var_quad_node);
+    m_var_manager.buildEntryList(var_name_node, var_info_node, var_value_node, var_quad_node, var_ptr_node);
     m_evt_manager.buildEntryList(evt_name_node, evt_info_node);
     m_prop_manager.buildEntryList(prop_name_node, prop_info_node);
 

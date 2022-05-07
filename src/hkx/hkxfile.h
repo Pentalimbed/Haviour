@@ -19,7 +19,7 @@ enum HkxFileEventEnum
     kEventObjChanged
 };
 
-// Single file
+// Single behaviour file
 class HkxFile
 {
 public:
@@ -104,13 +104,15 @@ public:
     void cleanupEvents();
     void cleanupProps();
 
+    pugi::xml_node m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
+
 private:
     bool m_loaded = false;
 
     std::string        m_path;
     pugi::xml_document m_doc;
     pugi::xml_node     m_data_node;
-    pugi::xml_node     m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
+
 
     uint16_t m_latest_id = 0;
 
@@ -118,6 +120,11 @@ private:
     StringMap<std::vector<std::string>> m_obj_class_list;
     StringMap<StringSet>                m_obj_ref_list;
     StringMap<StringSet>                m_obj_ref_by_list;
+};
+
+// skeleton hkx
+class SkeletonFile
+{
 };
 
 // Managing files

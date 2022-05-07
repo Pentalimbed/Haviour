@@ -195,7 +195,7 @@ void VarEdit::showEvtList()
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
         current_file.reindexEvents();
-    addTooltip("Reindex events\nDiscard all events marked obsolete");
+    addTooltip("Reindex events\nDiscard all events marked obsolete\nApply changes to quad & pointer value set");
 
     ImGui::InputText("Filter", &m_evt_filter);
 

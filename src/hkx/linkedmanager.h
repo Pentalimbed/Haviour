@@ -198,15 +198,18 @@ enum VariableTypeEnum : int8_t;
 class VariableManager : public LinkedPropertyManager<Variable>
 {
 public:
-    void                         buildEntryList(pugi::xml_node name_node, pugi::xml_node info_node, pugi::xml_node value_node, pugi::xml_node quad_node);
+    void                         buildEntryList(pugi::xml_node name_node, pugi::xml_node info_node, pugi::xml_node value_node, pugi::xml_node quad_node, pugi::xml_node ptr_node);
     Variable                     addEntry(VariableTypeEnum data_type);
     inline std::array<float, 4>& getQuadValue(size_t idx) { return m_quads[idx]; }
+    inline std::string&          getPointerValue(size_t idx) { return m_ptrs[idx]; }
 
     robin_hood::unordered_map<size_t, size_t> reindex();
 
 private:
     std::vector<std::array<float, 4>> m_quads;
+    std::vector<std::string>          m_ptrs;
     pugi::xml_node                    m_quad_node;
+    pugi::xml_node                    m_ptr_node;
 
     using LinkedPropertyManager<Variable>::buildEntryList;
     using LinkedPropertyManager<Variable>::addEntry;

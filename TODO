@@ -15,3 +15,7 @@ Behaviour diagnosis
 - 0.2a Automatic state id distribution
 Bone weight/index array
 - 0.2a Opitimize buildRefList
+- Edit pointer variable
+- BlenderGen fix
+Ref count does not take pointer variables into consideration
+Display names within the text edit when not editing

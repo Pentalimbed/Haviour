@@ -643,7 +643,7 @@ UICLASS(hkbBlenderGenerator)
             edit_child = result;
 
         ImGui::TableNextColumn();
-        if (ImGui::BeginTable("hkbBlenderGenerator2", 2, EditAreaTableFlag))
+        if (ImGui::BeginTable("hkbBlenderGenerator2", 2, EditAreaTableFlag, {-FLT_MIN, 27 * 10}))
         {
             stringEdit(obj.getByName("name"));
             intScalarEdit(obj.getByName("userData"), file, ImGuiDataType_U32);
