@@ -8,7 +8,7 @@
 
 namespace Haviour
 {
-inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::HkxFile& file)
+inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::BehaviourFile& file)
 {
     auto state_machine = getParentObj(hkparam);
     while (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
@@ -24,7 +24,7 @@ inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::HkxFile
     return {};
 }
 
-inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_id, Hkx::HkxFile& file)
+inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_id, Hkx::BehaviourFile& file)
 {
     if (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
         return {};
@@ -47,7 +47,7 @@ inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_i
     return {};
 }
 
-inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::HkxFile& file)
+inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::BehaviourFile& file)
 {
     if (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
         return -1;
@@ -72,7 +72,7 @@ inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::HkxFile& file)
 
 // get a path from a child to parent
 // the return starts(idx=0) from parent to child
-inline void getNavPath(const std::string& from, const std::string& to, Hkx::HkxFile& file, std::vector<std::string>& out)
+inline void getNavPath(const std::string& from, const std::string& to, Hkx::BehaviourFile& file, std::vector<std::string>& out)
 {
     StringMap<std::string>  prev_obj;
     std::stack<std::string> objs_to_check;

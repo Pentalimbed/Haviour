@@ -18,11 +18,10 @@ bool iconButton(const char* label)
     return ImGui::Button(label, ImVec2(10, 10));
 }
 
-void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine)
+void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine, Hkx::BehaviourFile& file)
 {
     if (ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        auto&              file        = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
         auto               states_node = state_machine.getByName("states");
         size_t             num_objs    = states_node.attribute("numelements").as_ullong();
         std::istringstream states_stream(states_node.text().as_string());
@@ -48,7 +47,74 @@ void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node
     }
 }
 
-void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::HkxFile& file)
+std::optional<int16_t> bonePickerButton(Hkx::SkeletonFile& skel_file, Hkx::BehaviourFile& file, int16_t value)
+{
+    bool set_focus = false;
+    if (ImGui::Button(ICON_FA_SEARCH))
+    {
+        ImGui::OpenPopup("select bone");
+        set_focus = true;
+    }
+    addTooltip("Select");
+
+    static std::string search_text      = {};
+    static bool        use_ragdoll_skel = false;
+
+    if (ImGui::BeginPopup("select bone", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
+    {
+        if (skel_file.isFileLoaded())
+        {
+            ImGui::Checkbox("Ragdoll Skeleton", &use_ragdoll_skel);
+            if (set_focus)
+                ImGui::SetKeyboardFocusHere();
+            ImGui::InputText("Filter", &search_text);
+
+            ImGui::Separator();
+
+            std::vector<std::string_view> bone_list;
+            skel_file.getBoneList(bone_list, use_ragdoll_skel);
+
+            if (bone_list.empty())
+                ImGui::TextDisabled("No bones.");
+            else
+            {
+                std::erase_if(bone_list,
+                              [=](std::string_view bone) {
+                                  return !search_text.empty() && std::ranges::search(bone, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty();
+                              });
+
+                ImGui::BeginChild("ITEMS", {400.0f, 20.0f * std::min(bone_list.size(), 30ull)}, false);
+                {
+                    ImGuiListClipper clipper;
+                    clipper.Begin(bone_list.size());
+
+                    while (clipper.Step())
+                        for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+                        {
+                            auto bone           = bone_list[row_n];
+                            auto bone_disp_name = fmt::format("{:4} {}", row_n, bone);
+
+                            if (ImGui::Selectable(bone_disp_name.c_str(), value == row_n))
+                            {
+                                value = row_n;
+                                ImGui::CloseCurrentPopup();
+                                ImGui::EndPopup();
+                                return row_n;
+                            }
+                        }
+                }
+                ImGui::EndChild();
+            }
+        }
+        else
+            ImGui::TextDisabled("No loaded skeleton file.");
+
+        ImGui::EndPopup();
+    }
+    return std::nullopt;
+}
+
+void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file)
 {
     static pugi::xml_node param_cache;
     static pugi::xml_node bindings     = {};
@@ -107,15 +173,22 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::HkxFile& 
             ImGui::EndPopup();
         }
 
+        bool set_focus = false;
         if (open_var)
+        {
+            set_focus = true;
             ImGui::OpenPopup("bindvar");
+        }
         if (open_prop)
+        {
+            set_focus = true;
             ImGui::OpenPopup("bindprop");
+        }
 
         Hkx::Variable          var;
         Hkx::CharacterProperty prop;
-        bool                   do_bind_var  = linkedPropPickerPopup("bindvar", file.m_var_manager, var);
-        bool                   do_bind_prop = linkedPropPickerPopup("bindprop", file.m_prop_manager, prop);
+        bool                   do_bind_var  = linkedPropPickerPopup("bindvar", file.m_var_manager, set_focus, var);
+        bool                   do_bind_prop = linkedPropPickerPopup("bindprop", file.m_prop_manager, set_focus, prop);
 
         if (do_bind_var || do_bind_prop)
         {
@@ -164,7 +237,7 @@ void stringEdit(pugi::xml_node hkparam, std::string_view hint, std::string_view 
     ImGui::TableNextColumn();
 }
 
-void boolEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
+void boolEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     bool value = hkparam.text().as_bool();
@@ -177,7 +250,7 @@ void boolEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint,
     varBindingButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), hkparam, file);
 }
 
-void intScalarEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, ImGuiDataType data_type, std::string_view hint, std::string_view manual_name)
+void intScalarEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, ImGuiDataType data_type, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     union
@@ -257,7 +330,7 @@ void intScalarEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, ImGuiDataType dat
 //     ImGui::TableNextColumn();
 // }
 
-void sliderFloatEdit(pugi::xml_node hkparam, float lb, float ub, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
+void sliderFloatEdit(pugi::xml_node hkparam, float lb, float ub, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     float value = hkparam.text().as_float();
@@ -270,7 +343,7 @@ void sliderFloatEdit(pugi::xml_node hkparam, float lb, float ub, Hkx::HkxFile& f
     varBindingButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), hkparam, file);
 }
 
-void floatEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
+void floatEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
     float value = hkparam.text().as_float();
@@ -297,7 +370,7 @@ void convertFloatEdit(pugi::xml_node hkparam, std::string_view hint, std::string
     ImGui::TableNextColumn();
 }
 
-void quadEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
+void quadEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
 
@@ -316,7 +389,7 @@ void quadEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint,
     varBindingButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), hkparam, file);
 }
 
-void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classes, Hkx::HkxFile& file, std::string_view hint, std::string_view manual_name)
+void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classes, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
 {
     ImGui::TableNextColumn();
 
@@ -401,7 +474,7 @@ void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classe
 bool refEdit(std::string&                         value,
              const std::vector<std::string_view>& classes,
              pugi::xml_node                       parent,
-             Hkx::HkxFile&                        file,
+             Hkx::BehaviourFile&                  file,
              std::string_view                     hint,
              std::string_view                     manual_name)
 {
@@ -484,7 +557,7 @@ bool refEdit(std::string&                         value,
 
 void refList(pugi::xml_node                       hkparam,
              const std::vector<std::string_view>& classes,
-             Hkx::HkxFile&                        file,
+             Hkx::BehaviourFile&                  file,
              std::string_view                     hint_attribute,
              std::string_view                     name_attribute,
              std::string_view                     manual_name)
@@ -503,10 +576,7 @@ void refList(pugi::xml_node                       hkparam,
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data()), ImGui::SameLine();
     if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
-    {
-        hkparam.attribute("numelements") = hkparam.attribute("numelements").as_int() + 1;
         objs.push_back("null");
-    }
     addTooltip("Add new object reference");
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
@@ -534,12 +604,10 @@ void refList(pugi::xml_node                       hkparam,
             ImGui::PopID();
         }
         if (do_delete)
-        {
             objs.erase(objs.begin() + mark_delete);
-            hkparam.attribute("numelements") = hkparam.attribute("numelements").as_int() - 1;
-        }
 
-        hkparam.text() = printIdVector(objs).c_str();
+        hkparam.text()                   = printVector(objs).c_str();
+        hkparam.attribute("numelements") = objs.size();
 
         ImGui::EndTable();
     }
@@ -548,7 +616,7 @@ void refList(pugi::xml_node                       hkparam,
 pugi::xml_node refLiveEditList(
     pugi::xml_node                       hkparam,
     const std::vector<std::string_view>& classes,
-    Hkx::HkxFile&                        file,
+    Hkx::BehaviourFile&                  file,
     std::string_view                     hint_attribute,
     std::string_view                     name_attribute,
     std::string_view                     manual_name)
@@ -614,7 +682,7 @@ pugi::xml_node refLiveEditList(
             hkparam.attribute("numelements") = hkparam.attribute("numelements").as_int() - 1;
         }
 
-        hkparam.text() = printIdVector(objs).c_str();
+        hkparam.text() = printVector(objs).c_str();
 
         ImGui::EndTable();
     }
@@ -625,7 +693,7 @@ void objLiveEditList(
     pugi::xml_node                             hkparam,
     pugi::xml_node&                            edit_item,
     const char*                                def_str,
-    Hkx::HkxFile&                              file,
+    Hkx::BehaviourFile&                        file,
     std::string_view                           str_id,
     std::function<std::string(pugi::xml_node)> disp_name_func)
 {
@@ -659,11 +727,11 @@ void objLiveEditList(
     }
 }
 
-void stateEdit(pugi::xml_node   hkparam,
-               Hkx::HkxFile&    file,
-               pugi::xml_node   state_machine,
-               std::string_view hint,
-               std::string_view manual_name)
+void stateEdit(pugi::xml_node      hkparam,
+               Hkx::BehaviourFile& file,
+               pugi::xml_node      state_machine,
+               std::string_view    hint,
+               std::string_view    manual_name)
 {
     ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
 
@@ -673,10 +741,11 @@ void stateEdit(pugi::xml_node   hkparam,
 
     if (ImGui::Button(ICON_FA_SEARCH))
         ImGui::OpenPopup("select state");
+    addTooltip("Select");
 
     if (state_machine)
     {
-        statePickerPopup("select state", hkparam, state_machine);
+        statePickerPopup("select state", hkparam, state_machine, file);
         if (auto state = getStateById(state_machine, hkparam.text().as_int(), file); state)
         {
             ImGui::SameLine();
@@ -687,9 +756,28 @@ void stateEdit(pugi::xml_node   hkparam,
     ImGui::PopID();
 }
 
+void boneEdit(pugi::xml_node      hkparam,
+              Hkx::BehaviourFile& file,
+              Hkx::SkeletonFile&  skel_file,
+              std::string_view    hint,
+              std::string_view    manual_name)
+{
+    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
+
+    intScalarEdit(hkparam, file, ImGuiDataType_S16, hint, manual_name);
+    if (getParentObj(hkparam).getByName("variableBindingSet"))
+        ImGui::SameLine();
+
+    auto picked_bone = bonePickerButton(skel_file, file, hkparam.text().as_int());
+    if (picked_bone.has_value())
+        hkparam.text() = picked_bone.value();
+
+    ImGui::PopID();
+}
+
 ////////////////    Linked Prop Edits
 
-void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
+void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& file)
 {
     if (ImGui::BeginPopup(str_id))
     {
@@ -769,7 +857,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::HkxFile& file)
     }
 }
 
-void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::HkxFile& file)
+void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::BehaviourFile& file)
 {
     if (ImGui::BeginPopup(str_id))
     {
@@ -805,7 +893,7 @@ void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::HkxFile& fi
     }
 }
 
-void propEditPopup(const char* str_id, Hkx::CharacterProperty& prop, Hkx::HkxFile& file)
+void propEditPopup(const char* str_id, Hkx::CharacterProperty& prop, Hkx::BehaviourFile& file)
 {
     if (ImGui::BeginPopup(str_id))
     {

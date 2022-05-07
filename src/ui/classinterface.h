@@ -11,6 +11,6 @@ namespace Haviour
 {
 namespace Ui
 {
-void showEditUi(pugi::xml_node hkobject, Hkx::HkxFile& file);
+void showEditUi(pugi::xml_node hkobject, Hkx::BehaviourFile& file);
 } // namespace Ui
 } // namespace Haviour

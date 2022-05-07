@@ -19,7 +19,7 @@ enum HkxFileEventEnum
     kEventObjChanged
 };
 
-// Single behaviour file
+// generic unpacked hkx
 class HkxFile
 {
 public:
@@ -27,6 +27,21 @@ public:
     void                    saveFile(std::string_view path = {});
     inline bool             isFileLoaded() { return m_loaded; }
     inline std::string_view getPath() { return m_path; }
+
+protected:
+    bool m_loaded = false;
+
+    std::string        m_path, m_filename;
+    pugi::xml_document m_doc;
+    pugi::xml_node     m_data_node;
+};
+
+// Single behaviour file
+class BehaviourFile : public HkxFile
+{
+public:
+    void loadFile(std::string_view path);
+    void saveFile(std::string_view path = {});
 
     void        addRef(std::string_view id, std::string_view parent_id);
     void        deRef(std::string_view id, std::string_view parent_id);
@@ -105,15 +120,7 @@ public:
     void cleanupProps();
 
     pugi::xml_node m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
-
 private:
-    bool m_loaded = false;
-
-    std::string        m_path;
-    pugi::xml_document m_doc;
-    pugi::xml_node     m_data_node;
-
-
     uint16_t m_latest_id = 0;
 
     StringMap<pugi::xml_node>           m_obj_list;
@@ -123,8 +130,21 @@ private:
 };
 
 // skeleton hkx
-class SkeletonFile
+class SkeletonFile : public HkxFile
 {
+public:
+    void loadFile(std::string_view path);
+
+    void                    getBoneList(std::vector<std::string_view>& out, bool ragdoll = false);
+    inline std::string_view getBone(size_t idx, bool ragdoll = false)
+    {
+        return getNthChild(ragdoll ? m_skel_rag_obj.getByName("bones") : m_skel_obj.getByName("bones"), idx).getByName("name").text().as_string();
+    }
+
+private:
+    pugi::xml_node m_skel_obj, m_skel_rag_obj;
+
+    using HkxFile::saveFile;
 };
 
 // Managing files
@@ -138,15 +158,15 @@ public:
         m_current_file = idx;
         dispatch(kEventFileChanged);
     }
-    inline size_t   getCurrentFileIdx() { return m_current_file; }
-    inline HkxFile& getCurrentFile() { return m_files[m_current_file]; }
+    inline size_t         getCurrentFileIdx() { return m_current_file; }
+    inline BehaviourFile& getCurrentFile() { return m_files[m_current_file]; }
 
     inline bool                          isFileSelected() { return m_current_file >= 0; }
     inline std::vector<std::string_view> getPathList()
     {
         std::vector<std::string_view> retval;
         retval.reserve(m_files.size());
-        std::ranges::transform(m_files, std::back_inserter(retval), [](HkxFile& file) { return file.getPath(); });
+        std::ranges::transform(m_files, std::back_inserter(retval), [](BehaviourFile& file) { return file.getPath(); });
         return retval;
     }
 
@@ -168,9 +188,11 @@ public:
         dispatch(kEventFileChanged);
     }
 
+    SkeletonFile m_skel_file;
+
 private:
-    int                  m_current_file = -1;
-    std::vector<HkxFile> m_files;
+    int                        m_current_file = -1;
+    std::vector<BehaviourFile> m_files;
 };
 
 } // namespace Hkx

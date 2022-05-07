@@ -116,11 +116,17 @@ inline std::string hkobj2str(pugi::xml_node obj)
     return fmt::format("{} [{}] - {}", obj.attribute("name").as_string(), getObjContextName(obj), obj.attribute("class").as_string());
 }
 
-inline std::string printIdVector(std::vector<std::string> ids)
+template <typename T>
+inline std::string printVector(const std::vector<T>& vec)
 {
     std::string retval = {};
-    for (size_t i = 0; i < ids.size(); ++i)
-        retval.append(fmt::format("{} {}", ids[i], ((i + 1) % 10) ? "" : "\n"));
+    for (size_t i = 0; i < vec.size(); ++i)
+    {
+        if constexpr (std::is_same_v<T, float>)
+            retval.append(fmt::format("{:.6f} {}", vec[i], ((i + 1) % 10) ? "" : "\n"));
+        else
+            retval.append(fmt::format("{} {}", vec[i], ((i + 1) % 10) ? "" : "\n"));
+    }
     return retval;
 }
 
@@ -147,4 +153,15 @@ inline std::string getParamPath(pugi::xml_node hkparam)
         hkparam = hkparam.parent();
     }
     return {retval.begin() + 1, retval.end()};
+}
+
+inline pugi::xml_node getNthChild(pugi::xml_node node, size_t n)
+{
+    auto retval = node.first_child();
+    while (n)
+    {
+        retval = retval.next_sibling();
+        --n;
+    }
+    return retval;
 }

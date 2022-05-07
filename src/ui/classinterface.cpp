@@ -15,7 +15,7 @@ namespace Ui
 
 constexpr auto EditAreaTableFlag = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
 
-#define UICLASS(hkclass) void show_##hkclass(pugi::xml_node obj, Hkx::HkxFile& file)
+#define UICLASS(hkclass) void show_##hkclass(pugi::xml_node obj, Hkx::BehaviourFile& file)
 
 ///////////////////////    NOT REGISTERED BUT COMMONLY USED
 
@@ -33,14 +33,14 @@ UICLASS(hkbEvent)
 {
     linkedPropPickerEdit(obj.getByName("id"), file, file.m_evt_manager);
     refEdit(obj.getByName("payload"), {"hkbStringEventPayload"}, file);
-    if (auto payload = Hkx::HkxFileManager::getSingleton()->getCurrentFile().getObj(obj.getByName("payload").text().as_string()); payload)
+    if (auto payload = file.getObj(obj.getByName("payload").text().as_string()); payload)
     {
         ImGui::Indent(10);
         show_hkbStringEventPayload(payload, file);
         ImGui::Indent(-10);
     }
 }
-void hkbEventSelectable(pugi::xml_node obj, Hkx::HkxFile& file, const char* hint, const char* text)
+void hkbEventSelectable(pugi::xml_node obj, Hkx::BehaviourFile& file, const char* hint, const char* text)
 {
     ImGui::PushID(text);
 
@@ -203,13 +203,13 @@ UICLASS(hkbModifier)
 UICLASS(BSLookAtModifier_Bone)
 {
     boolEdit(obj.getByName("enabled"), file);
-    intScalarEdit(obj.getByName("index"), file, ImGuiDataType_S16);
+    boneEdit(obj.getByName("index"), file, Hkx::HkxFileManager::getSingleton()->m_skel_file);
     quadEdit(obj.getByName("fwdAxisLS"), file);
     floatEdit(obj.getByName("limitAngleDegrees"), file);
     floatEdit(obj.getByName("onGain"), file);
     floatEdit(obj.getByName("offGain"), file);
 }
-void BSLookAtModifierBoneArray(pugi::xml_node hkparam, Hkx::HkxFile& file)
+void BSLookAtModifierBoneArray(pugi::xml_node hkparam, Hkx::BehaviourFile& file)
 {
     ImGui::AlignTextToFramePadding();
     ImGui::BulletText(hkparam.attribute("name").as_string()), ImGui::SameLine();
@@ -231,7 +231,10 @@ void BSLookAtModifierBoneArray(pugi::xml_node hkparam, Hkx::HkxFile& file)
         size_t         i           = 0;
         for (auto bone : hkparam.children())
         {
-            auto disp_name = bone.getByName("index").text().as_string();
+            auto&       skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+            std::string disp_name = bone.getByName("index").text().as_string();
+            if (skel_file.isFileLoaded())
+                disp_name = fmt::format("{} {}", disp_name, skel_file.getBone(i));
 
             ImGui::PushID(i);
 
@@ -243,9 +246,9 @@ void BSLookAtModifierBoneArray(pugi::xml_node hkparam, Hkx::HkxFile& file)
             }
             addTooltip("Remove");
             ImGui::SameLine();
-            if (ImGui::Selectable(disp_name, ImGui::IsPopupOpen(disp_name)))
-                ImGui::OpenPopup(disp_name);
-            if (ImGui::BeginPopup(disp_name, ImGuiWindowFlags_AlwaysAutoResize))
+            if (ImGui::Selectable(disp_name.c_str(), ImGui::IsPopupOpen(disp_name.c_str())))
+                ImGui::OpenPopup(disp_name.c_str());
+            if (ImGui::BeginPopup(disp_name.c_str(), ImGuiWindowFlags_AlwaysAutoResize))
             {
                 if (ImGui::BeginTable("hkbBehaviorGraph", 2, ImGuiTableFlags_SizingStretchProp, {400.0f, -FLT_MIN}))
                 {
@@ -734,34 +737,54 @@ UICLASS(BSBoneSwitchGenerator)
 
 UICLASS(hkbBoneWeightArray)
 {
-    if (ImGui::BeginTable("hkbBoneWeightArray", 2, EditAreaTableFlag))
+    if (ImGui::BeginTable("hkbBoneWeightArray1", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
     {
         refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-
-        auto bone_weights = obj.getByName("boneWeights");
-
-        ImGui::TableNextColumn();
-        size_t numelements = bone_weights.attribute("numelements").as_ullong();
-        if (ImGui::InputScalar("numelements", ImGuiDataType_U64, &numelements))
-            bone_weights.attribute("numelements") = numelements;
-
-        ImGui::TableNextColumn();
-
-        ImGui::TableNextColumn();
-        std::string value = bone_weights.text().as_string();
-        if (ImGui::InputTextMultiline(bone_weights.attribute("name").as_string(), &value))
-            bone_weights.text() = value.c_str();
-        addTooltip("A weight for each bone.\nIf the list is too short, missing bones are assumed to have weight 1.");
-
-        ImGui::TableNextColumn();
-
         ImGui::EndTable();
     }
+    ImGui::Separator();
+
+    ImGui::PushID("boneWeights");
+
+    auto               bone_weights_obj = obj.getByName("boneWeights");
+    std::istringstream bone_weights_stream(bone_weights_obj.text().as_string());
+    auto               num_weights = bone_weights_obj.attribute("numelements").as_ullong();
+    std::vector<float> bone_weights(num_weights);
+    for (size_t i = 0; i < num_weights; ++i)
+        bone_weights_stream >> bone_weights[i];
+
+    ImGui::TextUnformatted("boneWeights");
+    addTooltip("A weight for each bone.\nIf the list is too short, missing bones are assumed to have weight 1.");
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+        bone_weights.push_back(0.0f);
+    addTooltip("Add item");
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_MINUS_CIRCLE) && !bone_weights.empty())
+        bone_weights.pop_back();
+    addTooltip("Remove item");
+    ImGui::SameLine();
+    ImGui::Text("%d", num_weights);
+
+    if (ImGui::BeginTable("hkbBoneWeightArray2", 4, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_ScrollY))
+    {
+        for (size_t i = 0; i < bone_weights.size(); ++i)
+        {
+            ImGui::TableNextColumn();
+            ImGui::InputFloat(fmt::format("{}", i).c_str(), &bone_weights[i], 0.0f, 0.0f, "%.6f");
+        }
+        ImGui::EndTable();
+    }
+
+    bone_weights_obj.text()                   = printVector(bone_weights).c_str();
+    bone_weights_obj.attribute("numelements") = bone_weights.size();
+
+    ImGui::PopID();
 }
 
 UICLASS(hkbBoneIndexArray)
 {
-    if (ImGui::BeginTable("hkbBoneIndexArray", 2, EditAreaTableFlag))
+    if (ImGui::BeginTable("hkbBoneIndexArray", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
     {
         refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
 
@@ -778,12 +801,55 @@ UICLASS(hkbBoneIndexArray)
         std::string value = bone_indices.text().as_string();
         if (ImGui::InputTextMultiline(bone_indices.attribute("name").as_string(), &value))
             bone_indices.text() = value.c_str();
-        addTooltip("An array of bone indices.");
+
 
         ImGui::TableNextColumn();
 
         ImGui::EndTable();
     }
+    ImGui::Separator();
+
+    ImGui::PushID("boneIndices");
+
+    auto&                skel_file    = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+    auto                 bone_idx_obj = obj.getByName("boneIndices");
+    std::istringstream   bone_idx_stream(bone_idx_obj.text().as_string());
+    auto                 num_idxs = bone_idx_obj.attribute("numelements").as_ullong();
+    std::vector<int16_t> bone_idxs(num_idxs);
+    for (size_t i = 0; i < num_idxs; ++i)
+        bone_idx_stream >> bone_idxs[i];
+
+    ImGui::TextUnformatted("boneIndices");
+    addTooltip("An array of bone indices.");
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+        bone_idxs.push_back(-1);
+    addTooltip("Add item");
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_MINUS_CIRCLE) && !bone_idxs.empty())
+        bone_idxs.pop_back();
+    addTooltip("Remove item");
+    ImGui::SameLine();
+    ImGui::Text("%d", num_idxs);
+
+    if (ImGui::BeginTable("hkbBoneIndexArray2", 8, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY))
+    {
+        for (size_t i = 0; i < bone_idxs.size(); ++i)
+        {
+            ImGui::PushID(i);
+            ImGui::TableNextColumn();
+            ImGui::InputScalar(fmt::format("{}", i).c_str(), ImGuiDataType_S16, &bone_idxs[i]);
+            ImGui::TableNextColumn();
+            bonePickerButton(skel_file, file, bone_idxs[i]);
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+
+    bone_idx_obj.text()                   = printVector(bone_idxs).c_str();
+    bone_idx_obj.attribute("numelements") = bone_idxs.size();
+
+    ImGui::PopID();
 }
 
 UICLASS(hkbClipTriggerArray)
@@ -995,7 +1061,7 @@ UICLASS(hkbBehaviorReferenceGenerator)
 
 UICLASS(hkbPoseMatchingGenerator)
 {
-    if (ImGui::BeginTable("hkbPoseMatchingGenerator", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 6}))
+    if (ImGui::BeginTable("hkbPoseMatchingGenerator", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 6 + 2 * 3}))
     {
         quadEdit(obj.getByName("worldFromModelRotation"), file,
                  "The rotation of the frame of reference used for pose matching.");
@@ -1025,14 +1091,15 @@ UICLASS(hkbPoseMatchingGenerator)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("rootBoneIndex"), file, ImGuiDataType_S16,
-                      "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
-        intScalarEdit(obj.getByName("otherBoneIndex"), file, ImGuiDataType_S16,
-                      "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
-        intScalarEdit(obj.getByName("anotherBoneIndex"), file, ImGuiDataType_S16,
-                      "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
-        intScalarEdit(obj.getByName("pelvisIndex"), file, ImGuiDataType_S16,
-                      "The (ragdoll) pelvis bone used to measure the speed of the ragdoll.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("rootBoneIndex"), file, skel_file,
+                 "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        boneEdit(obj.getByName("otherBoneIndex"), file, skel_file,
+                 "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        boneEdit(obj.getByName("anotherBoneIndex"), file, skel_file,
+                 "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        boneEdit(obj.getByName("pelvisIndex"), file, skel_file,
+                 "The (ragdoll) pelvis bone used to measure the speed of the ragdoll.");
 
         ImGui::EndTable();
     }
@@ -1337,12 +1404,13 @@ UICLASS(hkbGetUpModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("rootBoneIndex"), file, ImGuiDataType_S16,
-                      "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
-        intScalarEdit(obj.getByName("otherBoneIndex"), file, ImGuiDataType_S16,
-                      "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
-        intScalarEdit(obj.getByName("anotherBoneIndex"), file, ImGuiDataType_S16,
-                      "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("rootBoneIndex"), file, skel_file,
+                 "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        boneEdit(obj.getByName("otherBoneIndex"), file, skel_file,
+                 "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
+        boneEdit(obj.getByName("anotherBoneIndex"), file, skel_file,
+                 "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.");
 
         ImGui::EndTable();
     }
@@ -1388,8 +1456,8 @@ UICLASS(hkbKeyframeBonesModifier)
                          "The position of the keyframed bone.");
                 quadEdit(edit_info.getByName("keyframedRotation"), file,
                          "The orientation of the keyframed bone.");
-                intScalarEdit(edit_info.getByName("boneIndex"), file, ImGuiDataType_S16,
-                              "The ragdoll bone to be keyframed.");
+                boneEdit(edit_info.getByName("boneIndex"), file, Hkx::HkxFileManager::getSingleton()->m_skel_file,
+                         "The ragdoll bone to be keyframed.");
                 boolEdit(edit_info.getByName("isValid"), file,
                          "Whether or not m_keyframedPosition and m_keyframedRotation are valid.");
 
@@ -1428,25 +1496,26 @@ UICLASS(hkbPoweredRagdollControlsModifier)
         ImGui::TableNextColumn();
 
         {
-            auto cdata = obj.getByName("controlData").first_child();
-            auto wdata = obj.getByName("worldFromModelModeData").first_child();
+            auto  cdata     = obj.getByName("controlData").first_child();
+            auto  wdata     = obj.getByName("worldFromModelModeData").first_child();
+            auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
 
             sliderFloatEdit(cdata.getByName("maxForce"), 0.0f, 1000.0f, file,
                             "The maximum force applied to each joint.");
-            intScalarEdit(wdata.getByName("poseMatchingBone0"), file, ImGuiDataType_S16,
-                          "The root bone used for pose matching.\n\n"
-                          "Pose matching uses three bone from the ragdoll skeleton which are assumed to be representative of the pose.\n"
-                          "The L-shaped skeleton between these three bones is matched to determine similar poses.");
+            boneEdit(wdata.getByName("poseMatchingBone0"), file, skel_file,
+                     "The root bone used for pose matching.\n\n"
+                     "Pose matching uses three bone from the ragdoll skeleton which are assumed to be representative of the pose.\n"
+                     "The L-shaped skeleton between these three bones is matched to determine similar poses.");
 
             sliderFloatEdit(cdata.getByName("tau"), 0.0f, 1.0f, file,
                             "The stiffness of the motors. Larger numbers will result in faster, more abrupt, convergence.");
-            intScalarEdit(wdata.getByName("poseMatchingBone1"), file, ImGuiDataType_S16,
-                          "A second bone used for pose matching.");
+            boneEdit(wdata.getByName("poseMatchingBone1"), file, skel_file,
+                     "A second bone used for pose matching.");
 
             sliderFloatEdit(cdata.getByName("damping"), 0.0f, 1.0f, file,
                             "The damping of the motors.");
-            intScalarEdit(wdata.getByName("poseMatchingBone2"), file, ImGuiDataType_S16,
-                          "A third bone used for pose matching.");
+            boneEdit(wdata.getByName("poseMatchingBone2"), file, skel_file,
+                     "A third bone used for pose matching.");
 
             sliderFloatEdit(cdata.getByName("proportionalRecoveryVelocity"), 0.0f, 100.0f, file,
                             "This term is multipled by the error of the motor to compute a velocity for the motor to move it toward zero error.");
@@ -1719,10 +1788,11 @@ UICLASS(hkbTwistModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("startBoneIndex"), file, ImGuiDataType_S16,
-                      "Index of the first bone in the chain.  This bone must be closer to the root than endBoneIndex.");
-        intScalarEdit(obj.getByName("endBoneIndex"), file, ImGuiDataType_S16,
-                      "Index of the last bone in the chain.  This bone must be farther from the root than startBoneIndex.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("startBoneIndex"), file, skel_file,
+                 "Index of the first bone in the chain.  This bone must be closer to the root than endBoneIndex.");
+        boneEdit(obj.getByName("endBoneIndex"), file, skel_file,
+                 "Index of the last bone in the chain.  This bone must be farther from the root than startBoneIndex.");
 
         fullTableSeparator();
 
@@ -1751,11 +1821,12 @@ UICLASS(BSDirectAtModifier)
         fullTableSeparator();
 
         boolEdit(obj.getByName("directAtTarget"), file);
-        intScalarEdit(obj.getByName("sourceBoneIndex"), file, ImGuiDataType_S16);
-        intScalarEdit(obj.getByName("startBoneIndex"), file, ImGuiDataType_S16,
-                      "Index of the first bone in the chain.  This bone must be closer to the root than endBoneIndex.");
-        intScalarEdit(obj.getByName("endBoneIndex"), file, ImGuiDataType_S16,
-                      "Index of the last bone in the chain.  This bone must be farther from the root than startBoneIndex.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("sourceBoneIndex"), file, skel_file);
+        boneEdit(obj.getByName("startBoneIndex"), file, skel_file,
+                 "Index of the first bone in the chain.  This bone must be closer to the root than endBoneIndex.");
+        boneEdit(obj.getByName("endBoneIndex"), file, skel_file,
+                 "Index of the last bone in the chain.  This bone must be farther from the root than startBoneIndex.");
 
         fullTableSeparator();
 
@@ -2124,10 +2195,11 @@ UICLASS(hkbDetectCloseToGroundModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("boneIndex"), file, ImGuiDataType_S16,
-                      "The bone used to cast ray for determining the ground height.");
-        intScalarEdit(obj.getByName("animBoneIndex"), file, ImGuiDataType_S16,
-                      "The bone used to cast ray for determining the ground height.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("boneIndex"), file, skel_file,
+                 "The bone used to cast ray for determining the ground height.");
+        boneEdit(obj.getByName("animBoneIndex"), file, skel_file,
+                 "The bone used to cast ray for determining the ground height.");
 
         fullTableSeparator();
 
@@ -2159,12 +2231,13 @@ UICLASS(hkbExtractRagdollPoseModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("poseMatchingBone0"), file, ImGuiDataType_S16,
-                      "A bone to use for pose matching when computing the world-from-model.");
-        intScalarEdit(obj.getByName("poseMatchingBone1"), file, ImGuiDataType_S16,
-                      "A bone to use for pose matching when computing the world-from-model.");
-        intScalarEdit(obj.getByName("poseMatchingBone2"), file, ImGuiDataType_S16,
-                      "A bone to use for pose matching when computing the world-from-model.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("poseMatchingBone0"), file, skel_file,
+                 "A bone to use for pose matching when computing the world-from-model.");
+        boneEdit(obj.getByName("poseMatchingBone1"), file, skel_file,
+                 "A bone to use for pose matching when computing the world-from-model.");
+        boneEdit(obj.getByName("poseMatchingBone2"), file, skel_file,
+                 "A bone to use for pose matching when computing the world-from-model.");
         boolEdit(obj.getByName("enableComputeWorldFromModel"), file,
                  "Whether to enable the computation of the world-from-model from the ragdoll pose.");
 
@@ -2228,12 +2301,13 @@ UICLASS(hkbLookAtModifier)
                         "Gain used to smooth out the motion when the character stops looking at a target. Default value is 0.05.");
         floatEdit(obj.getByName("limitAngleRight"), file,
                   "The maximum angle to look right");
-        intScalarEdit(obj.getByName("headIndex"), file, ImGuiDataType_S16,
-                      "Index of the head bone. If this is not -1, it overrides the character boneInfo.");
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("headIndex"), file, skel_file,
+                 "Index of the head bone. If this is not -1, it overrides the character boneInfo.");
         floatEdit(obj.getByName("limitAngleUp"), file,
                   "The maximum angle to look up");
-        intScalarEdit(obj.getByName("neckIndex"), file, ImGuiDataType_S16,
-                      "Index of the neck bone. If this is not -1, it overrides the character boneInfo.");
+        boneEdit(obj.getByName("neckIndex"), file, skel_file,
+                 "Index of the neck bone. If this is not -1, it overrides the character boneInfo.");
         floatEdit(obj.getByName("limitAngleDown"), file,
                   "The maximum angle to look down");
 
@@ -2324,7 +2398,7 @@ UICLASS(BSComputeAddBoneAnimModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("boneIndex"), file, ImGuiDataType_S16);
+        boneEdit(obj.getByName("boneIndex"), file, Hkx::HkxFileManager::getSingleton()->m_skel_file);
 
         ImGui::EndTable();
     }
@@ -2431,8 +2505,9 @@ UICLASS(BSLimbIKModifier)
 
         fullTableSeparator();
 
-        intScalarEdit(obj.getByName("startBoneIndex"), file, ImGuiDataType_S16);
-        intScalarEdit(obj.getByName("endBoneIndex"), file, ImGuiDataType_S16);
+        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+        boneEdit(obj.getByName("startBoneIndex"), file, skel_file);
+        boneEdit(obj.getByName("endBoneIndex"), file, skel_file);
 
         fullTableSeparator();
 
@@ -2470,7 +2545,7 @@ UICLASS(BSIsActiveModifier)
 
 UICLASS(BSLookAtModifier)
 {
-    if (ImGui::BeginTable("BSLookAtModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 10 + 2 * 4}))
+    if (ImGui::BeginTable("BSLookAtModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 10 + 2 * 5}))
     {
         show_hkbModifier(obj, file);
 
@@ -2659,7 +2734,7 @@ UICLASS(BSSpeedSamplerModifier)
 #        hkclass, show_##hkclass \
     }
 
-const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_node, Hkx::HkxFile&)>> g_class_ui_map =
+const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_node, Hkx::BehaviourFile&)>> g_class_ui_map =
     {UIMAPITEM(hkbBehaviorGraph),
      UIMAPITEM(hkbVariableBindingSet),
      UIMAPITEM(hkbStateMachine),
@@ -2728,7 +2803,7 @@ const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_n
      UIMAPITEM(BSTweenerModifier),
      UIMAPITEM(BSSpeedSamplerModifier)};
 
-void showEditUi(pugi::xml_node hkobject, Hkx::HkxFile& file)
+void showEditUi(pugi::xml_node hkobject, Hkx::BehaviourFile& file)
 {
     auto hkclass = hkobject.attribute("class").as_string();
     if (g_class_ui_map.contains(hkclass))

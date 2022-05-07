@@ -3,6 +3,8 @@
 
 #include <memory>
 #include <execution>
+#include <filesystem>
+
 #include <spdlog/spdlog.h>
 
 namespace Haviour
@@ -11,18 +13,12 @@ namespace Hkx
 {
 void HkxFile::loadFile(std::string_view path)
 {
-    auto file_logger  = spdlog::default_logger()->clone(path.data());
-    auto file_manager = HkxFileManager::getSingleton();
+    m_path     = path;
+    m_filename = std::filesystem::path(path).filename().string();
 
-    m_path = path;
+    m_loaded = false;
 
-    m_loaded    = false;
-    m_latest_id = 0;
-
-    m_obj_list.clear();
-    m_obj_class_list.clear();
-    m_obj_ref_list.clear();
-    m_obj_ref_by_list.clear();
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
 
     auto result = m_doc.load_file(path.data(), pugi::parse_default & (~pugi::parse_escapes));
     if (!result)
@@ -39,6 +35,41 @@ void HkxFile::loadFile(std::string_view path)
         file_logger->error("File is not a hkxpackfile [no hkpackfile or hksection].");
         return;
     }
+
+    m_loaded = true;
+}
+
+void HkxFile::saveFile(std::string_view path)
+{
+    if (path.empty())
+        path = m_path;
+    else
+        m_path = path;
+    m_filename = std::filesystem::path(path).filename().string();
+
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    file_logger->info("Saving file...");
+
+    if (!m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes))
+        file_logger->warn("Failed to save file!");
+}
+
+void BehaviourFile::loadFile(std::string_view path)
+{
+    HkxFile::loadFile(path);
+    if (!m_loaded)
+        return;
+
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    m_loaded    = false;
+    m_latest_id = 0;
+
+    m_obj_list.clear();
+    m_obj_class_list.clear();
+    m_obj_ref_list.clear();
+    m_obj_ref_by_list.clear();
 
     // populate node list
     for (auto hkobject = m_data_node.child("hkobject"); hkobject; hkobject = hkobject.next_sibling("hkobject"))
@@ -116,23 +147,16 @@ void HkxFile::loadFile(std::string_view path)
     m_loaded = true;
 }
 
-void HkxFile::saveFile(std::string_view path)
+void BehaviourFile::saveFile(std::string_view path)
 {
     reindexEvents();
     reindexProperties();
     reindexVariables();
 
-    if (path.empty())
-        path = m_path;
-    else
-        m_path = path;
-
-    spdlog::info("Saving file: {}", path);
-
-    m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes);
+    HkxFile::saveFile(path);
 }
 
-void HkxFile::addRef(std::string_view id, std::string_view parent_id)
+void BehaviourFile::addRef(std::string_view id, std::string_view parent_id)
 {
     if (getObj(id) && getObj(parent_id))
     {
@@ -140,25 +164,27 @@ void HkxFile::addRef(std::string_view id, std::string_view parent_id)
         m_obj_ref_by_list.find(id)->second.emplace(parent_id);
     }
 }
-void HkxFile::deRef(std::string_view id, std::string_view parent_id)
+void BehaviourFile::deRef(std::string_view id, std::string_view parent_id)
 {
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
     if (getObj(id) && getObj(parent_id))
     {
         auto& ref_by_list = m_obj_ref_by_list.find(id)->second;
         if (ref_by_list.contains(parent_id))
             ref_by_list.erase(std::string{parent_id});
         else
-            spdlog::warn("Attempting to dereference {0} from {1} but {0} is not referenced by {1}!", id, parent_id);
+            file_logger->warn("Attempting to dereference {0} from {1} but {0} is not referenced by {1}!", id, parent_id);
 
         auto& ref_list = m_obj_ref_list.find(parent_id)->second;
         if (ref_list.contains(id))
             ref_list.erase(std::string{id});
         else
-            spdlog::warn("Attempting to dereference {0} from {1} but {1} is not referencing {0}!", id, parent_id);
+            file_logger->warn("Attempting to dereference {0} from {1} but {1} is not referencing {0}!", id, parent_id);
     }
 }
 
-void HkxFile::buildRefList()
+void BehaviourFile::buildRefList()
 {
     m_obj_ref_by_list.clear();
     m_obj_ref_list.clear();
@@ -172,7 +198,7 @@ void HkxFile::buildRefList()
     for (auto& [id, obj] : m_obj_list)
         buildRefList(id);
 }
-void HkxFile::buildRefList(std::string_view id)
+void BehaviourFile::buildRefList(std::string_view id)
 {
     auto obj = getObj(id);
     if (!obj) return;
@@ -209,12 +235,14 @@ void HkxFile::buildRefList(std::string_view id)
         m_obj_ref_by_list.find(refed_id)->second.emplace(id);
 }
 
-std::string_view HkxFile::addObj(std::string_view hkclass)
+std::string_view BehaviourFile::addObj(std::string_view hkclass)
 {
-    spdlog::info("Attempting to add new {} ...", hkclass);
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    file_logger->info("Attempting to add new {} ...", hkclass);
     if (m_latest_id >= 9999)
     {
-        spdlog::warn("Exceeding object id limit (9999). Consider doing some cleaning or making a separate file for one of the branches.");
+        file_logger->warn("Exceeding object id limit (9999). Consider doing some cleaning or making a separate file for one of the branches.");
         return {};
     }
 
@@ -232,30 +260,32 @@ std::string_view HkxFile::addObj(std::string_view hkclass)
         m_obj_ref_by_list[id_str] = {};
         m_obj_ref_list[id_str]    = {};
 
-        spdlog::info("Added new object {}", id_str);
+        file_logger->info("Added new object {}", id_str);
         HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
         return m_obj_list.find(id_str)->first;
     }
     else
     {
-        spdlog::warn("Adding new object of class {} is currently not supported.", hkclass);
+        file_logger->warn("Adding new object of class {} is currently not supported.", hkclass);
         return {};
     }
 }
-void HkxFile::delObj(std::string_view id)
+void BehaviourFile::delObj(std::string_view id)
 {
-    spdlog::info("Attempting to delete object {} ...", id);
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    file_logger->info("Attempting to delete object {} ...", id);
 
     auto obj = getObj(id);
     if (!obj)
     {
-        spdlog::warn("No object {}", id);
+        file_logger->warn("No object {}", id);
         return;
     }
 
     if (isObjEssential(id))
     {
-        spdlog::warn("Object {} is essential.", id);
+        file_logger->warn("Object {} is essential.", id);
         return;
     }
 
@@ -263,7 +293,7 @@ void HkxFile::delObj(std::string_view id)
 
     if (hasRef(id))
     {
-        spdlog::warn("Object {} is still referenced by other objects.", id);
+        file_logger->warn("Object {} is still referenced by other objects.", id);
         return;
     }
 
@@ -284,13 +314,15 @@ void HkxFile::delObj(std::string_view id)
     m_obj_ref_by_list.erase(m_obj_ref_by_list.find(id));
     m_obj_ref_list.erase(m_obj_ref_list.find(id));
 
-    spdlog::info("Object {} deleted.", id);
+    file_logger->info("Object {} deleted.", id);
     HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
 
-void HkxFile::reindexObj(uint16_t start_id)
+void BehaviourFile::reindexObj(uint16_t start_id)
 {
-    spdlog::info("Attempting to reindex all objects...");
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    file_logger->info("Attempting to reindex all objects...");
 
     // get the id map
     StringMap<std::string> remap = {};
@@ -375,11 +407,9 @@ void HkxFile::reindexObj(uint16_t start_id)
     for (auto [key, obj] : m_obj_list)
         obj.attribute("name") = key.c_str();
 
-    spdlog::info("All objects reindexed.");
+    file_logger->info("All objects reindexed.");
     HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
-
-// #define FIND_PARAM_VAL(param, val) m_data_node.find_node([=](pugi::xml_node node) { return !strcmp(node.attribute("name").as_string(), param) && (node.text().as_int() == val); });
 
 static bool isVarNode(pugi::xml_node node)
 {
@@ -423,81 +453,30 @@ static bool isPropNode(pugi::xml_node node)
 }
 
 // Should've used xpath but whatever
-pugi::xml_node HkxFile::getFirstVarRef(size_t idx, bool ret_obj)
+pugi::xml_node BehaviourFile::getFirstVarRef(size_t idx, bool ret_obj)
 {
     auto var_idx_node = m_data_node.find_node([=](auto node) { return isVarNode(node) && (node.text().as_ullong() == idx); });
     if (var_idx_node)
         return ret_obj ? getParentObj(var_idx_node) : var_idx_node;
     return {};
-    // {
-    //     // bindings
-    //     auto var_idx_node = m_data_node.find_node([=](pugi::xml_node node) { return !strcmp(node.attribute("name").as_string(), "variableIndex") &&
-    //                                                                              (node.text().as_int() == idx) &&
-    //                                                                              !strcmp(node.parent().getByName( "bindingType").text().as_string(), "BINDING_TYPE_VARIABLE"); });
-    //     if (var_idx_node) return ret_obj ? var_idx_node.parent().parent().parent() : var_idx_node;
-    // }
-    // // hkbStateMachine
-    // auto var_idx_node = FIND_PARAM_VAL("syncVariableIndex", idx);
-    // if (var_idx_node) return ret_obj ? var_idx_node.parent() : var_idx_node;
-    // // expressionsData
-    // var_idx_node = FIND_PARAM_VAL("assignmentVariableIndex", idx);
-    // if (var_idx_node) return ret_obj ? var_idx_node.parent().parent().parent() : var_idx_node;
-    // return {};
 }
 
-pugi::xml_node HkxFile::getFirstEventRef(size_t idx, bool ret_obj)
+pugi::xml_node BehaviourFile::getFirstEventRef(size_t idx, bool ret_obj)
 {
     auto evt_idx_node = m_data_node.find_node([=](auto node) { return isEvtNode(node) && (node.text().as_ullong() == idx); });
     if (evt_idx_node)
         return ret_obj ? getParentObj(evt_idx_node) : evt_idx_node;
     return {};
-    // // Transitions
-    // auto evt_idx_node = FIND_PARAM_VAL("eventId", idx);
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent();
-    // evt_idx_node = FIND_PARAM_VAL("enterEventId", idx);
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent().parent().parent();
-    // evt_idx_node = FIND_PARAM_VAL("exitEventId", idx);
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent().parent().parent();
-    // // hkbClipTriggerArray
-    // evt_idx_node = m_data_node.find_node(
-    //     [=](pugi::xml_node node) {
-    //         if(!strcmp(node.attribute("name").as_string(), "id") && (node.text().as_int() == idx))
-    //         {
-    //             auto parent = node.parent().parent();
-    //             return !strcmp(parent.attribute("name").as_string(), "event");
-    //         }
-    //         return false; });
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent().parent().parent();
-    // // hkbStateMachineEventPropertyArray
-    // evt_idx_node = m_data_node.find_node(
-    //     [=](pugi::xml_node node) {
-    //         if(!strcmp(node.attribute("name").as_string(), "id") && (node.text().as_int() == idx))
-    //         {
-    //             auto parent = node.parent().parent();
-    //             return !strcmp(parent.attribute("name").as_string(), "events");
-    //         }
-    //         return false; });
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent();
-    // // expressionsData
-    // evt_idx_node = FIND_PARAM_VAL("assignmentEventIndex", idx);
-    // if (evt_idx_node) return evt_idx_node.parent().parent().parent();
-    // return {};
 }
-pugi::xml_node HkxFile::getFirstPropRef(size_t idx, bool ret_obj)
+pugi::xml_node BehaviourFile::getFirstPropRef(size_t idx, bool ret_obj)
 {
     auto prop_idx_node = m_data_node.find_node([=](auto node) { return isPropNode(node) && (node.text().as_ullong() == idx); });
     if (prop_idx_node)
         return ret_obj ? getParentObj(prop_idx_node) : prop_idx_node;
     return {};
-    // // bindings
-    // auto charprop_idx_node = m_data_node.find_node([=](pugi::xml_node node) { return !strcmp(node.attribute("name").as_string(), "variableIndex") &&
-    //                                                                               (node.text().as_int() == idx) &&
-    //                                                                               !strcmp(node.parent().getByName( "bindingType").text().as_string(), "BINDING_TYPE_CHARACTER_PROPERTY"); });
-    // if (charprop_idx_node) return charprop_idx_node.parent().parent().parent();
-    // return {};
 }
 
-void HkxFile::reindexVariables()
+void BehaviourFile::reindexVariables()
 {
     auto remap = m_var_manager.reindex();
 
@@ -515,7 +494,7 @@ void HkxFile::reindexVariables()
     walker.m_remap = &remap;
     m_data_node.traverse(walker);
 }
-void HkxFile::reindexEvents()
+void BehaviourFile::reindexEvents()
 {
     auto remap = m_evt_manager.reindex();
 
@@ -533,7 +512,7 @@ void HkxFile::reindexEvents()
     walker.m_remap = &remap;
     m_data_node.traverse(walker);
 }
-void HkxFile::reindexProperties()
+void BehaviourFile::reindexProperties()
 {
     auto remap = m_prop_manager.reindex();
 
@@ -552,7 +531,7 @@ void HkxFile::reindexProperties()
     m_data_node.traverse(walker);
 }
 
-void HkxFile::cleanupVariables()
+void BehaviourFile::cleanupVariables()
 {
     robin_hood::unordered_map<size_t, bool> refmap;
     for (size_t i = 0; i < m_var_manager.size(); ++i)
@@ -577,7 +556,7 @@ void HkxFile::cleanupVariables()
             m_var_manager.delEntry(idx);
 }
 
-void HkxFile::cleanupEvents()
+void BehaviourFile::cleanupEvents()
 {
     robin_hood::unordered_map<size_t, bool> refmap;
     for (size_t i = 0; i < m_evt_manager.size(); ++i)
@@ -602,7 +581,7 @@ void HkxFile::cleanupEvents()
             m_evt_manager.delEntry(idx);
 }
 
-void HkxFile::cleanupProps()
+void BehaviourFile::cleanupProps()
 {
     robin_hood::unordered_map<size_t, bool> refmap;
     for (size_t i = 0; i < m_prop_manager.size(); ++i)
@@ -625,6 +604,44 @@ void HkxFile::cleanupProps()
     for (auto [idx, is_refed] : refmap)
         if (!is_refed)
             m_prop_manager.delEntry(idx);
+}
+
+//////////////////////    SKELLY
+
+void SkeletonFile::loadFile(std::string_view path)
+{
+    HkxFile::loadFile(path);
+    if (!m_loaded)
+        return;
+    m_loaded = false;
+
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    auto skels = m_data_node.select_nodes("hkobject[@class='hkaSkeleton']");
+    for (auto skel : skels)
+    {
+        if (std::string_view(skel.node().getByName("name").text().as_string()).starts_with("Ragdoll"))
+            m_skel_rag_obj = skel.node();
+        else
+            m_skel_obj = skel.node();
+    }
+
+    if (!m_skel_obj)
+    {
+        file_logger->error("Couldn't find main skeleton!");
+        return;
+    }
+    if (!m_skel_rag_obj)
+        file_logger->error("Couldn't find ragdoll skeleton!");
+
+    file_logger->info("Skeleton file loaded.");
+    m_loaded = true;
+}
+
+void SkeletonFile::getBoneList(std::vector<std::string_view>& out, bool ragdoll)
+{
+    for (auto bone : (ragdoll ? m_skel_rag_obj : m_skel_obj).getByName("bones").children())
+        out.push_back(bone.getByName("name").text().as_string());
 }
 
 //////////////////////    FILE MANAGER

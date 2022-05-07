@@ -222,10 +222,34 @@ void showMenuBar()
                         file_manager->setCurrentFile(i);
 
             ImGui::Separator();
+
             if (ImGui::MenuItem("Close", "Ctrl+F4"))
                 file_manager->closeCurrentFile();
             if (ImGui::MenuItem("Close All"))
                 file_manager->closeAllFiles();
+
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Resources"))
+        {
+            if (ImGui::MenuItem("Load Skeleton"))
+            {
+                nfdchar_t*  outPath = nullptr;
+                nfdresult_t result  = NFD_OpenDialog(nullptr, nullptr, &outPath);
+                if (result == NFD_OKAY)
+                {
+                    file_manager->m_skel_file.loadFile(outPath);
+                    free(outPath);
+                }
+                else if (result == NFD_ERROR)
+                {
+                    spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
+                }
+            }
+
+            ImGui::Separator();
+
+            ImGui::TextDisabled("Skelton: %s", file_manager->m_skel_file.isFileLoaded() ? file_manager->m_skel_file.getPath().data() : "None");
 
             ImGui::EndMenu();
         }
