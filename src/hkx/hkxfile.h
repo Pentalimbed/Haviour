@@ -28,21 +28,6 @@ public:
     inline bool             isFileLoaded() { return m_loaded; }
     inline std::string_view getPath() { return m_path; }
 
-protected:
-    bool m_loaded = false;
-
-    std::string        m_path, m_filename;
-    pugi::xml_document m_doc;
-    pugi::xml_node     m_data_node;
-};
-
-// Single behaviour file
-class BehaviourFile : public HkxFile
-{
-public:
-    void loadFile(std::string_view path);
-    void saveFile(std::string_view path = {});
-
     void        addRef(std::string_view id, std::string_view parent_id);
     void        deRef(std::string_view id, std::string_view parent_id);
     inline bool hasRef(std::string_view id) { return m_obj_ref_by_list.contains(id) && !m_obj_ref_by_list.find(id)->second.empty(); }
@@ -87,20 +72,45 @@ public:
             out.push_back(pair.first);
         std::ranges::sort(out);
     }
+
+    std::string_view addObj(std::string_view hkclass);
+    void             delObj(std::string_view id);
+    void             reindexObj(uint16_t start_id = 100);
+
+    virtual bool isObjEssential(std::string_view id) = 0;
+
+protected:
+    bool m_loaded = false;
+
+    std::string        m_path, m_filename;
+    pugi::xml_document m_doc;
+    pugi::xml_node     m_data_node;
+    uint16_t           m_latest_id = 0;
+
+    StringMap<pugi::xml_node>           m_obj_list;
+    StringMap<std::vector<std::string>> m_obj_class_list;
+    StringMap<StringSet>                m_obj_ref_list;
+    StringMap<StringSet>                m_obj_ref_by_list;
+};
+
+// Single behaviour file
+class BehaviourFile : public HkxFile
+{
+public:
+    void loadFile(std::string_view path);
+    void saveFile(std::string_view path = {});
+
+
     inline std::string_view getRootStateMachine()
     {
         return m_graph_obj.getByName("rootGenerator").text().as_string();
     }
 
-    inline bool isObjEssential(std::string_view id)
+    inline virtual bool isObjEssential(std::string_view id) override
     {
         auto essential_obj = {m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj};
         return std::ranges::find(essential_obj, getObj(id)) != essential_obj.end();
     }
-
-    std::string_view addObj(std::string_view hkclass);
-    void             delObj(std::string_view id);
-    void             reindexObj(uint16_t start_id = 100);
 
     AnimationEventManager    m_evt_manager;
     VariableManager          m_var_manager;
@@ -121,12 +131,6 @@ public:
 
     pugi::xml_node m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
 private:
-    uint16_t m_latest_id = 0;
-
-    StringMap<pugi::xml_node>           m_obj_list;
-    StringMap<std::vector<std::string>> m_obj_class_list;
-    StringMap<StringSet>                m_obj_ref_list;
-    StringMap<StringSet>                m_obj_ref_by_list;
 };
 
 // skeleton hkx
@@ -141,10 +145,31 @@ public:
         return getNthChild(ragdoll ? m_skel_rag_obj.getByName("bones") : m_skel_obj.getByName("bones"), idx).getByName("name").text().as_string();
     }
 
+    inline virtual bool isObjEssential(std::string_view) override { return true; }
+
 private:
     pugi::xml_node m_skel_obj, m_skel_rag_obj;
+};
 
-    using HkxFile::saveFile;
+// character hkx
+class CharacterFile : public HkxFile
+{
+public:
+    void loadFile(std::string_view path);
+
+    inline virtual bool isObjEssential(std::string_view id) override
+    {
+        auto essential_obj = {/*m_root_obj, m_graph_obj,*/ m_char_data_obj, m_char_str_data_obj, m_var_value_obj};
+        return std::ranges::find(essential_obj, getObj(id)) != essential_obj.end();
+    }
+
+    inline pugi::xml_node getAnimNames() { return m_anim_name_node; }
+
+private:
+    VariableManager m_prop_manager; // naming a bit confusing but charprops are essentially variables in character files
+
+    pugi::xml_node m_anim_name_node;
+    pugi::xml_node m_char_data_obj, m_char_str_data_obj, m_var_value_obj;
 };
 
 // Managing files
@@ -188,7 +213,8 @@ public:
         dispatch(kEventFileChanged);
     }
 
-    SkeletonFile m_skel_file;
+    SkeletonFile  m_skel_file;
+    CharacterFile m_char_file;
 
 private:
     int                        m_current_file = -1;

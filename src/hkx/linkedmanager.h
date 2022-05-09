@@ -103,7 +103,15 @@ public:
             return {};
     }
     inline std::vector<T> getEntryList() { return m_entries; }
-    inline T              addEntry()
+    inline T              getEntryByName(std::string_view name)
+    {
+        auto res = std::ranges::find_if(m_entries, [=](auto& entry) { return !_stricmp(name.data(), entry.getName()); });
+        if (res == m_entries.end())
+            return {};
+        else
+            return *res;
+    }
+    inline T addEntry()
     {
         auto retval    = T::create(m_container_nodes);
         retval.m_index = m_entries.size();

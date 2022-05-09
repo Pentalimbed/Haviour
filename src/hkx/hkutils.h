@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #include <stack>
+#include <sstream>
 
 namespace Haviour
 {
@@ -107,6 +108,21 @@ inline void getNavPath(const std::string& from, const std::string& to, Hkx::Beha
             }
         }
     }
+}
+
+inline std::string hkTriggerArray2Str(pugi::xml_node trigger_array, Hkx::BehaviourFile& file)
+{
+    auto               triggers = trigger_array.getByName("triggers");
+    std::ostringstream stream;
+    for (auto trigger : triggers.children())
+        if (auto id = trigger.getByName("event").first_child().getByName("id").text(); id.as_llong() >= 0)
+        {
+            stream << file.m_evt_manager.getEntry(id.as_ullong()).getName() << " ";
+            if (trigger.getByName("acyclic").text().as_bool())
+                stream << '+';
+            stream << trigger.getByName("localTime").text().as_string() << std::endl;
+        }
+    return stream.str();
 }
 
 } // namespace Haviour

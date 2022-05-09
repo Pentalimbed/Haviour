@@ -36,34 +36,6 @@ void HkxFile::loadFile(std::string_view path)
         return;
     }
 
-    m_loaded = true;
-}
-
-void HkxFile::saveFile(std::string_view path)
-{
-    if (path.empty())
-        path = m_path;
-    else
-        m_path = path;
-    m_filename = std::filesystem::path(path).filename().string();
-
-    auto file_logger = spdlog::default_logger()->clone(m_filename);
-
-    file_logger->info("Saving file...");
-
-    if (!m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes))
-        file_logger->warn("Failed to save file!");
-}
-
-void BehaviourFile::loadFile(std::string_view path)
-{
-    HkxFile::loadFile(path);
-    if (!m_loaded)
-        return;
-
-    auto file_logger = spdlog::default_logger()->clone(m_filename);
-
-    m_loaded    = false;
     m_latest_id = 0;
 
     m_obj_list.clear();
@@ -97,66 +69,26 @@ void BehaviourFile::loadFile(std::string_view path)
         m_latest_id = std::max(id, m_latest_id);
     }
 
-    // get essential nodes
-    m_root_obj  = m_data_node.find_child_by_attribute("class", "hkRootLevelContainer");
-    m_graph_obj = m_data_node.find_child_by_attribute("class", "hkbBehaviorGraph");
-    if (!(m_root_obj && m_graph_obj && isRefBy(m_graph_obj.attribute("name").as_string(), m_root_obj)))
-    {
-        file_logger->error("Couldn't find behavior graph!");
-        return;
-    }
-
-    m_graph_data_obj     = getObj(m_graph_obj.getByName("data").text().as_string());
-    m_graph_str_data_obj = getObj(m_graph_data_obj.getByName("stringData").text().as_string());
-    m_var_value_obj      = getObj(m_graph_data_obj.getByName("variableInitialValues").text().as_string());
-    if (!(m_graph_data_obj && m_graph_str_data_obj && m_var_value_obj))
-    {
-        file_logger->error("Couldn't find essential objects! (hkbBehaviorGraphData, hkbBehaviorGraphStringData or hkbVariableValueSet)");
-        return;
-    }
-
-    // get manager nodes
-    auto var_info_node  = m_graph_data_obj.getByName("variableInfos");
-    auto var_name_node  = m_graph_str_data_obj.getByName("variableNames");
-    auto var_value_node = m_var_value_obj.getByName("wordVariableValues");
-    auto var_quad_node  = m_var_value_obj.getByName("quadVariableValues");
-    auto var_ptr_node   = m_var_value_obj.getByName("variantVariableValues");
-
-    auto evt_info_node = m_graph_data_obj.getByName("eventInfos");
-    auto evt_name_node = m_graph_str_data_obj.getByName("eventNames");
-
-    auto prop_info_node = m_graph_data_obj.getByName("characterPropertyInfos");
-    auto prop_name_node = m_graph_str_data_obj.getByName("characterPropertyNames");
-
-    if (!(var_info_node && var_name_node && var_value_node && var_quad_node && var_ptr_node &&
-          evt_info_node && evt_name_node &&
-          prop_info_node && prop_name_node))
-    {
-        file_logger->error("Couldn't find variable / animation event / character property info!");
-        return;
-    }
-
-    m_var_manager.buildEntryList(var_name_node, var_info_node, var_value_node, var_quad_node, var_ptr_node);
-    m_evt_manager.buildEntryList(evt_name_node, evt_info_node);
-    m_prop_manager.buildEntryList(prop_name_node, prop_info_node);
-
-    buildRefList();
-
-    file_logger->info("File successfully loaded with {} hkobjects, {} hkclasses, {} variables, {} animation events and {} character properties",
-                      m_obj_list.size(), m_obj_class_list.size(), m_var_manager.size(), m_evt_manager.size(), m_prop_manager.size());
     m_loaded = true;
 }
 
-void BehaviourFile::saveFile(std::string_view path)
+void HkxFile::saveFile(std::string_view path)
 {
-    reindexEvents();
-    reindexProperties();
-    reindexVariables();
+    if (path.empty())
+        path = m_path;
+    else
+        m_path = path;
+    m_filename = std::filesystem::path(path).filename().string();
 
-    HkxFile::saveFile(path);
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    file_logger->info("Saving file...");
+
+    if (!m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes))
+        file_logger->warn("Failed to save file!");
 }
 
-void BehaviourFile::addRef(std::string_view id, std::string_view parent_id)
+void HkxFile::addRef(std::string_view id, std::string_view parent_id)
 {
     if (getObj(id) && getObj(parent_id))
     {
@@ -164,7 +96,7 @@ void BehaviourFile::addRef(std::string_view id, std::string_view parent_id)
         m_obj_ref_by_list.find(id)->second.emplace(parent_id);
     }
 }
-void BehaviourFile::deRef(std::string_view id, std::string_view parent_id)
+void HkxFile::deRef(std::string_view id, std::string_view parent_id)
 {
     auto file_logger = spdlog::default_logger()->clone(m_filename);
 
@@ -184,7 +116,7 @@ void BehaviourFile::deRef(std::string_view id, std::string_view parent_id)
     }
 }
 
-void BehaviourFile::buildRefList()
+void HkxFile::buildRefList()
 {
     m_obj_ref_by_list.clear();
     m_obj_ref_list.clear();
@@ -198,7 +130,7 @@ void BehaviourFile::buildRefList()
     for (auto& [id, obj] : m_obj_list)
         buildRefList(id);
 }
-void BehaviourFile::buildRefList(std::string_view id)
+void HkxFile::buildRefList(std::string_view id)
 {
     auto obj = getObj(id);
     if (!obj) return;
@@ -235,7 +167,7 @@ void BehaviourFile::buildRefList(std::string_view id)
         m_obj_ref_by_list.find(refed_id)->second.emplace(id);
 }
 
-std::string_view BehaviourFile::addObj(std::string_view hkclass)
+std::string_view HkxFile::addObj(std::string_view hkclass)
 {
     auto file_logger = spdlog::default_logger()->clone(m_filename);
 
@@ -270,7 +202,7 @@ std::string_view BehaviourFile::addObj(std::string_view hkclass)
         return {};
     }
 }
-void BehaviourFile::delObj(std::string_view id)
+void HkxFile::delObj(std::string_view id)
 {
     auto file_logger = spdlog::default_logger()->clone(m_filename);
 
@@ -318,7 +250,7 @@ void BehaviourFile::delObj(std::string_view id)
     HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
 
-void BehaviourFile::reindexObj(uint16_t start_id)
+void HkxFile::reindexObj(uint16_t start_id)
 {
     auto file_logger = spdlog::default_logger()->clone(m_filename);
 
@@ -411,45 +343,75 @@ void BehaviourFile::reindexObj(uint16_t start_id)
     HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
 
-static bool isVarNode(pugi::xml_node node)
+//////////////////// BEHAVIOUR
+
+void BehaviourFile::loadFile(std::string_view path)
 {
-    auto var_name = node.attribute("name").as_string();
-    return (!strcmp(var_name, "variableIndex") && !strcmp(node.parent().getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) ||
-        !strcmp(var_name, "syncVariableIndex") ||     // hkbStateMachine
-        !strcmp(var_name, "assignmentVariableIndex"); // hkbExpressionData
+    HkxFile::loadFile(path);
+    if (!m_loaded)
+        return;
+
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    m_loaded = false;
+
+    // get essential nodes
+    m_root_obj  = m_data_node.find_child_by_attribute("class", "hkRootLevelContainer");
+    m_graph_obj = m_data_node.find_child_by_attribute("class", "hkbBehaviorGraph");
+    if (!(m_root_obj && m_graph_obj && isRefBy(m_graph_obj.attribute("name").as_string(), m_root_obj)))
+    {
+        file_logger->error("Couldn't find behavior graph!");
+        return;
+    }
+
+    m_graph_data_obj     = getObj(m_graph_obj.getByName("data").text().as_string());
+    m_graph_str_data_obj = getObj(m_graph_data_obj.getByName("stringData").text().as_string());
+    m_var_value_obj      = getObj(m_graph_data_obj.getByName("variableInitialValues").text().as_string());
+    if (!(m_graph_data_obj && m_graph_str_data_obj && m_var_value_obj))
+    {
+        file_logger->error("Couldn't find essential objects! (hkbBehaviorGraphData, hkbBehaviorGraphStringData or hkbVariableValueSet)");
+        return;
+    }
+
+    // get manager nodes
+    auto var_info_node  = m_graph_data_obj.getByName("variableInfos");
+    auto var_name_node  = m_graph_str_data_obj.getByName("variableNames");
+    auto var_value_node = m_var_value_obj.getByName("wordVariableValues");
+    auto var_quad_node  = m_var_value_obj.getByName("quadVariableValues");
+    auto var_ptr_node   = m_var_value_obj.getByName("variantVariableValues");
+
+    auto evt_info_node = m_graph_data_obj.getByName("eventInfos");
+    auto evt_name_node = m_graph_str_data_obj.getByName("eventNames");
+
+    auto prop_info_node = m_graph_data_obj.getByName("characterPropertyInfos");
+    auto prop_name_node = m_graph_str_data_obj.getByName("characterPropertyNames");
+
+    if (!(var_info_node && var_name_node && var_value_node && var_quad_node && var_ptr_node &&
+          evt_info_node && evt_name_node &&
+          prop_info_node && prop_name_node))
+    {
+        file_logger->error("Couldn't find variable / animation event / character property info!");
+        return;
+    }
+
+    m_var_manager.buildEntryList(var_name_node, var_info_node, var_value_node, var_quad_node, var_ptr_node);
+    m_evt_manager.buildEntryList(evt_name_node, evt_info_node);
+    m_prop_manager.buildEntryList(prop_name_node, prop_info_node);
+
+    buildRefList();
+
+    file_logger->info("File successfully loaded with {} hkobjects, {} hkclasses, {} variables, {} animation events and {} character properties",
+                      m_obj_list.size(), m_obj_class_list.size(), m_var_manager.size(), m_evt_manager.size(), m_prop_manager.size());
+    m_loaded = true;
 }
 
-static bool isEvtNode(pugi::xml_node node)
+void BehaviourFile::saveFile(std::string_view path)
 {
-    auto node_name = node.attribute("name").as_string();
+    reindexEvents();
+    reindexProperties();
+    reindexVariables();
 
-    auto parentparent = node.parent().parent();
-    auto pp_name      = parentparent.attribute("name").as_string();
-    bool is_hkbEvent =
-        !strcmp(pp_name, "event") ||
-        !strcmp(pp_name, "events") ||
-        !strcmp(pp_name, "triggerEvent") ||                            // BSDistTriggerModifier & BSPassByTargetTriggerModifier
-        !strcmp(pp_name, "contactEvent") ||                            // BSRagdollContactListenerModifier
-        !strcmp(pp_name, "eventToSendWhenStateOrTransitionChanges") || // hkbStateMachine
-        !strcmp(pp_name, "EventToFreezeBlendValue") ||                 // BSCyclicBlendTransitionGenerator
-        !strcmp(pp_name, "EventToCrossBlend") ||
-        !strcmp(pp_name, "alarmEvent") ||    // hkbTimerModifier & BSTimerModifier
-        !strcmp(pp_name, "ungroundedEvent"); // hkbFootIkControlsModifier
-
-    return !strcmp(node_name, "eventId") ||   // hkbStateMachineTransitionInfo
-        !strcmp(node_name, "enterEventId") || // hkbStateMachineStateInfo/TimeInterval
-        !strcmp(node_name, "exitEventId") ||
-        !strcmp(node_name, "assignmentEventIndex") ||         // hkbExpressionData
-        !strcmp(node_name, "returnToPreviousStateEventId") || // hkbStateMachine
-        !strcmp(node_name, "randomTransitionEventId") ||
-        !strcmp(node_name, "transitionToNextHigherStateEventId") ||
-        !strcmp(node_name, "transitionToNextLowerStateEventId") ||
-        (!strcmp(node_name, "id") && is_hkbEvent);
-}
-
-static bool isPropNode(pugi::xml_node node)
-{
-    return (!strcmp(node.attribute("name").as_string(), "variableIndex") && !strcmp(node.parent().getByName("bindingType").text().as_string(), "BINDING_TYPE_CHARACTER_PROPERTY"));
+    HkxFile::saveFile(path);
 }
 
 // Should've used xpath but whatever
@@ -642,6 +604,53 @@ void SkeletonFile::getBoneList(std::vector<std::string_view>& out, bool ragdoll)
 {
     for (auto bone : (ragdoll ? m_skel_rag_obj : m_skel_obj).getByName("bones").children())
         out.push_back(bone.getByName("name").text().as_string());
+}
+
+//////////////////////    CHAR FILE
+
+void CharacterFile::loadFile(std::string_view path)
+{
+    HkxFile::loadFile(path);
+    if (!m_loaded)
+        return;
+    m_loaded = false;
+
+    auto file_logger = spdlog::default_logger()->clone(m_filename);
+
+    m_char_data_obj     = m_data_node.find_child_by_attribute("class", "hkbCharacterData");
+    m_char_str_data_obj = m_data_node.find_child_by_attribute("class", "hkbCharacterStringData");
+    m_var_value_obj     = m_data_node.find_child_by_attribute("class", "hkbVariableValueSet");
+
+    if (!(m_char_data_obj && m_char_str_data_obj && m_var_value_obj))
+    {
+        file_logger->error("Couldn't find essential objects! (hkbBehaviorGraphData, hkbBehaviorGraphStringData or hkbVariableValueSet)");
+        return;
+    }
+
+    m_anim_name_node = m_char_str_data_obj.getByName("animationNames");
+    if (!m_anim_name_node)
+    {
+        file_logger->error("Couldn't find animationNames!");
+        return;
+    }
+
+    auto var_info_node  = m_char_data_obj.getByName("characterPropertyInfos");
+    auto var_name_node  = m_char_str_data_obj.getByName("characterPropertyNames");
+    auto var_value_node = m_var_value_obj.getByName("wordVariableValues");
+    auto var_quad_node  = m_var_value_obj.getByName("quadVariableValues");
+    auto var_ptr_node   = m_var_value_obj.getByName("variantVariableValues");
+
+    if (!(var_info_node && var_name_node && var_value_node && var_quad_node && var_ptr_node))
+    {
+        file_logger->error("Couldn't find character property info!");
+        return;
+    }
+
+    m_prop_manager.buildEntryList(var_name_node, var_info_node, var_value_node, var_quad_node, var_ptr_node);
+
+    file_logger->info("Character file successfully loaded with {} hkobjects, {} hkclasses, {} character properties",
+                      m_obj_list.size(), m_obj_class_list.size(), m_prop_manager.size());
+    m_loaded = true;
 }
 
 //////////////////////    FILE MANAGER

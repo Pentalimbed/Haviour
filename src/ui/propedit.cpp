@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "hkx/hkclass.inl"
 #include "classinterface.h"
+#include "macros.h"
 
 #include <spdlog/spdlog.h>
 #include <imgui.h>
@@ -157,8 +158,29 @@ void PropEdit::show()
                         addTooltip("Reset.\nSet all parameteres to default.");
                     }
                     ImGui::SameLine();
-                    ImGui::Button(ICON_FA_SCROLL);
-                    addTooltip("Macros - Upcoming!");
+                    if (ImGui::Button(ICON_FA_SCROLL))
+                    {
+                        ImGui::OpenPopup("Macro Select");
+                    }
+                    addTooltip("Macros");
+                    if (ImGui::BeginPopup("Macro Select"))
+                    {
+                        bool has_something = false;
+                        for (auto& macro : MacroManager::getSingleton()->getMacros())
+                            if (!strcmp(macro->getClass(), class_str))
+                            {
+                                has_something = true;
+                                if (ImGui::Selectable(macro->getName()))
+                                {
+                                    ImGui::CloseCurrentPopup();
+                                    macro->open(edit_obj, &file);
+                                }
+                                addTooltip(macro->getHint());
+                            }
+                        if (!has_something)
+                            ImGui::TextDisabled("No macro for %s :(", class_str);
+                        ImGui::EndPopup();
+                    }
 
                     if (file.isObjEssential(m_edit_obj_id))
                     {

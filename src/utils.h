@@ -165,3 +165,44 @@ inline pugi::xml_node getNthChild(pugi::xml_node node, size_t n)
     }
     return retval;
 }
+
+inline bool isVarNode(pugi::xml_node node)
+{
+    auto var_name = node.attribute("name").as_string();
+    return (!strcmp(var_name, "variableIndex") && !strcmp(node.parent().getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) ||
+        !strcmp(var_name, "syncVariableIndex") ||     // hkbStateMachine
+        !strcmp(var_name, "assignmentVariableIndex"); // hkbExpressionData
+}
+
+inline bool isEvtNode(pugi::xml_node node)
+{
+    auto node_name = node.attribute("name").as_string();
+
+    auto parentparent = node.parent().parent();
+    auto pp_name      = parentparent.attribute("name").as_string();
+    bool is_hkbEvent =
+        !strcmp(pp_name, "event") ||
+        !strcmp(pp_name, "events") ||
+        !strcmp(pp_name, "triggerEvent") ||                            // BSDistTriggerModifier & BSPassByTargetTriggerModifier
+        !strcmp(pp_name, "contactEvent") ||                            // BSRagdollContactListenerModifier
+        !strcmp(pp_name, "eventToSendWhenStateOrTransitionChanges") || // hkbStateMachine
+        !strcmp(pp_name, "EventToFreezeBlendValue") ||                 // BSCyclicBlendTransitionGenerator
+        !strcmp(pp_name, "EventToCrossBlend") ||
+        !strcmp(pp_name, "alarmEvent") ||    // hkbTimerModifier & BSTimerModifier
+        !strcmp(pp_name, "ungroundedEvent"); // hkbFootIkControlsModifier
+
+    return !strcmp(node_name, "eventId") ||   // hkbStateMachineTransitionInfo
+        !strcmp(node_name, "enterEventId") || // hkbStateMachineStateInfo/TimeInterval
+        !strcmp(node_name, "exitEventId") ||
+        !strcmp(node_name, "assignmentEventIndex") ||         // hkbExpressionData
+        !strcmp(node_name, "returnToPreviousStateEventId") || // hkbStateMachine
+        !strcmp(node_name, "randomTransitionEventId") ||
+        !strcmp(node_name, "transitionToNextHigherStateEventId") ||
+        !strcmp(node_name, "transitionToNextLowerStateEventId") ||
+        (!strcmp(node_name, "id") && is_hkbEvent);
+}
+
+inline bool isPropNode(pugi::xml_node node)
+{
+    return (!strcmp(node.attribute("name").as_string(), "variableIndex") && !strcmp(node.parent().getByName("bindingType").text().as_string(), "BINDING_TYPE_CHARACTER_PROPERTY"));
+}

@@ -5,6 +5,8 @@
 #include "propedit.h"
 #include "columnview.h"
 #include "hkx/hkclass.inl"
+#include "macros.h"
+#include "widgets.h"
 
 #include <fstream>
 
@@ -232,6 +234,11 @@ void showMenuBar()
         }
         if (ImGui::BeginMenu("Resources"))
         {
+            if (ImGui::MenuItem("Load Project File")) {}
+            addTooltip("Load both the character and skeleton");
+
+            ImGui::Separator();
+
             if (ImGui::MenuItem("Load Skeleton"))
             {
                 nfdchar_t*  outPath = nullptr;
@@ -246,10 +253,25 @@ void showMenuBar()
                     spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
                 }
             }
+            if (ImGui::MenuItem("Load Character"))
+            {
+                nfdchar_t*  outPath = nullptr;
+                nfdresult_t result  = NFD_OpenDialog(nullptr, nullptr, &outPath);
+                if (result == NFD_OKAY)
+                {
+                    file_manager->m_char_file.loadFile(outPath);
+                    free(outPath);
+                }
+                else if (result == NFD_ERROR)
+                {
+                    spdlog::error("Error with file dialog:\n\t{}", NFD_GetError());
+                }
+            }
 
             ImGui::Separator();
 
             ImGui::TextDisabled("Skelton: %s", file_manager->m_skel_file.isFileLoaded() ? file_manager->m_skel_file.getPath().data() : "None");
+            ImGui::TextDisabled("Character: %s", file_manager->m_char_file.isFileLoaded() ? file_manager->m_char_file.getPath().data() : "None");
 
             ImGui::EndMenu();
         }
@@ -312,6 +334,8 @@ void showMainWindow()
     if (ColumnView::getSingleton()->m_show) ColumnView::getSingleton()->show();
 
     if (g_show_about) showAboutWindow();
+
+    MacroManager::getSingleton()->show();
 }
 } // namespace Ui
 

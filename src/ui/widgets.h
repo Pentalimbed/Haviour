@@ -36,10 +36,9 @@ const auto g_color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
 
 template <typename Manager>
-bool linkedPropPickerPopup(const char*              str_id,
-                           Manager&                 prop_manager,
-                           bool                     set_focus,
-                           typename Manager::Entry& out)
+std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id,
+                                                             Manager&    prop_manager,
+                                                             bool        set_focus)
 {
     static bool        need_update = true;
     static std::string search_text;
@@ -94,12 +93,11 @@ bool linkedPropPickerPopup(const char*              str_id,
 
                         if (ImGui::Selectable(prop_disp_name.c_str()))
                         {
-                            out = prop;
                             if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
                                 ImGui::PopStyleColor();
                             ImGui::CloseCurrentPopup();
                             ImGui::EndPopup();
-                            return true;
+                            return prop;
                         }
 
                         if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
@@ -112,7 +110,7 @@ bool linkedPropPickerPopup(const char*              str_id,
         ImGui::EndPopup();
     }
 
-    return false;
+    return std::nullopt;
 }
 
 template <size_t N>
@@ -186,7 +184,9 @@ void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array
 
 void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine, Hkx::BehaviourFile& file);
 
-std::optional<int16_t> bonePickerButton(Hkx::SkeletonFile& skel_file, Hkx::BehaviourFile& file, int16_t value);
+std::optional<int16_t> bonePickerButton(Hkx::SkeletonFile& skel_file, int16_t value);
+
+std::optional<std::string_view> animPickerButton(Hkx::CharacterFile& char_file, std::string_view value);
 
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file);
 
@@ -206,6 +206,11 @@ inline void fullTableSeparator()
 void stringEdit(pugi::xml_node   hkparam,
                 std::string_view hint        = {},
                 std::string_view manual_name = {});
+
+void animEdit(pugi::xml_node      hkparam,
+              Hkx::CharacterFile& char_file,
+              std::string_view    hint        = {},
+              std::string_view    manual_name = {});
 
 void boolEdit(pugi::xml_node      hkparam,
               Hkx::BehaviourFile& file,
@@ -282,9 +287,8 @@ void linkedPropPickerEdit(pugi::xml_node      hkparam,
     }
 
     // POPUP
-    typename Manager::Entry out_prop;
-    if (linkedPropPickerPopup("PickProp", prop_manager, set_focus, out_prop))
-        hkparam.text() = out_prop.m_index;
+    if (auto out_prop = linkedPropPickerPopup("PickProp", prop_manager, set_focus); out_prop.has_value())
+        hkparam.text() = out_prop.value().m_index;
 
     ImGui::PopID();
 }
@@ -317,6 +321,7 @@ void refEdit(pugi::xml_node                       hkparam,
              std::string_view                     hint        = {},
              std::string_view                     manual_name = {});
 
+// return true if delete is pressed
 bool refEdit(std::string&                         value,
              const std::vector<std::string_view>& classes,
              pugi::xml_node                       parent,

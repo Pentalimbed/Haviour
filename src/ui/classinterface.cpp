@@ -840,7 +840,7 @@ UICLASS(hkbBoneIndexArray)
             ImGui::TableNextColumn();
             ImGui::InputScalar(fmt::format("{}", i).c_str(), ImGuiDataType_S16, &bone_idxs[i]);
             ImGui::TableNextColumn();
-            bonePickerButton(skel_file, file, bone_idxs[i]);
+            bonePickerButton(skel_file, bone_idxs[i]);
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -918,8 +918,8 @@ UICLASS(hkbClipGenerator)
         stringEdit(obj.getByName("name"));
         intScalarEdit(obj.getByName("userData"), file, ImGuiDataType_U32);
         refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-        stringEdit(obj.getByName("animationName"),
-                   "The name of the animation to play.");
+        animEdit(obj.getByName("animationName"), Hkx::HkxFileManager::getSingleton()->m_char_file,
+                 "The name of the animation to play.");
 
         fullTableSeparator();
 

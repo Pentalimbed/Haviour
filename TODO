@@ -3,11 +3,11 @@
 - 0.1a Copy/paste ref management
 - 0.1a Disable unavailable classes options
 - 0.1a Display all available classes options in list view
-Loading character file
+- Loading character file
 Editing character file
 - 0.3a Loading skeleton file
 - 0.3a Bone select edit
-Animation edit
+- Animation edit
 Behaviour diagnosis
 - 0.2a Class hint
 - 0.1a New file
@@ -18,7 +18,8 @@ Behaviour diagnosis
 - 0.2a Opitimize buildRefList
 - 0.3a Edit pointer variable
 - 0.3a BlenderGen fix
-Ref count does not take pointer variables into consideration
+- Ref list update with pointer variables
 Display names within the var/state/ref/evt edit when not editing (using combobox?)
 - 0.3a Set keyboard focus when invoking var/evt select popup
-Refactor the edits cause it fucking sucks ass
+- Macros
+- Parse trigger macro

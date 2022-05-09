@@ -15,4 +15,5 @@ set(sources
 	src/ui/classinterface.cpp
 	src/ui/propedit.cpp
 	src/ui/columnview.cpp
+	src/ui/macros.cpp
 )
