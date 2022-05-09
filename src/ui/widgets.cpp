@@ -18,98 +18,95 @@ bool iconButton(const char* label)
     return ImGui::Button(label, ImVec2(10, 10));
 }
 
-void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine, Hkx::BehaviourFile& file)
+std::optional<pugi::xml_node> statePickerPopup(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id, bool just_open)
 {
-    if (ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::IsPopupOpen(str_id))
     {
-        auto               states_node = state_machine.getByName("states");
-        size_t             num_objs    = states_node.attribute("numelements").as_ullong();
-        std::istringstream states_stream(states_node.text().as_string());
+        auto                        states_node = state_machine.getByName("states");
+        size_t                      num_objs    = states_node.attribute("numelements").as_ullong();
+        std::istringstream          states_stream(states_node.text().as_string());
+        std::vector<pugi::xml_node> states(num_objs);
 
         for (size_t i = 0; i < num_objs; ++i)
         {
             std::string temp_str;
             states_stream >> temp_str;
-
-            auto state    = file.getObj(temp_str);
-            auto state_id = state.getByName("stateId").text().as_int();
-
-            const bool selected = false;
-            if (ImGui::Selectable(fmt::format("{:4} {}", state_id, state.getByName("name").text().as_string()).c_str(), selected))
-            {
-                hkparam.text() = state_id;
-                ImGui::CloseCurrentPopup();
-                break;
-            }
+            states[i] = file.getObj(temp_str);
         }
 
-        ImGui::EndPopup();
+        return pickerPopup<pugi::xml_node>(
+            str_id, states,
+            [](auto& state_obj, std::string_view filter_str) { 
+                auto state_id = state_obj.getByName("stateId").text().as_int();
+                return hasText(fmt::format("{:4} {}", state_id, state_obj.getByName("name").text().as_string()), filter_str); },
+            [=](auto& state_obj) {
+                auto state_id = state_obj.getByName("stateId").text().as_int();
+                return ImGui::Selectable(fmt::format("{:4} {}", state_id, state_obj.getByName("name").text().as_string()).c_str(), selected_state_id == state_id);
+            },
+            just_open);
     }
+    return std::nullopt;
 }
 
-std::optional<int16_t> bonePickerButton(Hkx::SkeletonFile& skel_file, int16_t value)
+std::optional<int16_t> bonePickerPopup(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id, bool just_open)
 {
-    bool set_focus = false;
-    if (ImGui::Button(ICON_FA_SEARCH))
-    {
-        ImGui::OpenPopup("select bone");
-        set_focus = true;
-    }
-    addTooltip("Select");
+    static bool use_ragdoll_skel = false;
 
-    static std::string search_text      = {};
-    static bool        use_ragdoll_skel = false;
-
-    if (ImGui::BeginPopup("select bone", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
+    if (ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
     {
         if (skel_file.isFileLoaded())
         {
             ImGui::Checkbox("Ragdoll Skeleton", &use_ragdoll_skel);
-            if (set_focus)
-                ImGui::SetKeyboardFocusHere();
-            ImGui::InputText("Filter", &search_text);
+            if (just_open)
+                ImGui::SetKeyboardFocusHere(); // set focus to keyboard
 
-            ImGui::Separator();
-
-            std::vector<std::string_view> bone_list;
-            skel_file.getBoneList(bone_list, use_ragdoll_skel);
-
-            if (bone_list.empty())
-                ImGui::TextDisabled("No bones.");
-            else
+            auto                                           bone_node = skel_file.getBoneNode(use_ragdoll_skel);
+            std::vector<std::pair<size_t, pugi::xml_node>> bone_list(bone_node.attribute("numelements").as_ullong());
+            size_t                                         idx = 0;
+            for (auto bone : bone_node.children())
             {
-                std::erase_if(bone_list,
-                              [=](std::string_view bone) {
-                                  return !search_text.empty() && std::ranges::search(bone, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty();
-                              });
+                bone_list[idx] = {idx, bone};
+                ++idx;
+            }
 
-                ImGui::BeginChild("ITEMS", {400.0f, 20.0f * std::min(bone_list.size(), 30ull)}, false);
-                {
-                    ImGuiListClipper clipper;
-                    clipper.Begin(bone_list.size());
+            auto res = filteredPickerListBox<std::pair<size_t, pugi::xml_node>>(
+                fmt::format("##{}", str_id).c_str(),
+                bone_list,
+                [=](auto& pair, std::string_view text) { return hasText(pair.second.getByName("name").text().as_string(), text); },
+                [=](auto& pair) { return ImGui::Selectable(fmt::format("{:4} {}", pair.first, pair.second.getByName("name").text().as_string()).c_str(), selected_bone_id == pair.first); });
 
-                    while (clipper.Step())
-                        for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
-                        {
-                            auto bone           = bone_list[row_n];
-                            auto bone_disp_name = fmt::format("{:4} {}", row_n, bone);
-
-                            if (ImGui::Selectable(bone_disp_name.c_str(), value == row_n))
-                            {
-                                ImGui::CloseCurrentPopup();
-                                ImGui::EndChild();
-                                ImGui::EndPopup();
-                                return row_n;
-                            }
-                        }
-                }
-                ImGui::EndChild();
+            if (res.has_value())
+            {
+                ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+                return res.value().first;
             }
         }
         else
+        {
             ImGui::TextDisabled("No loaded skeleton file.");
+        }
 
         ImGui::EndPopup();
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string_view> animPickerPopup(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim, bool just_open)
+{
+    if (ImGui::IsPopupOpen(str_id))
+    {
+        auto                          anim_names_node = char_file.getAnimNames();
+        std::vector<std::string_view> anim_list(anim_names_node.attribute("numelements").as_ullong());
+        size_t                        idx = 0;
+        for (auto anim_name : anim_names_node.children())
+            anim_list[idx++] = anim_name.text().as_string();
+
+        return pickerPopup<std::string_view>(
+            str_id, anim_list,
+            [](auto& name, std::string_view filter_str) { return hasText(name, filter_str); },
+            [=](auto& name) { return ImGui::Selectable(name.data(), name == selected_anim); },
+            just_open);
     }
     return std::nullopt;
 }
@@ -174,7 +171,7 @@ std::optional<std::string_view> animPickerButton(Hkx::CharacterFile& char_file, 
             }
         }
         else
-            ImGui::TextDisabled("No loaded skeleton file.");
+            ImGui::TextDisabled("No loaded character file.");
 
         ImGui::EndPopup();
     }
@@ -311,8 +308,7 @@ void animEdit(pugi::xml_node      hkparam,
 
     stringEdit(hkparam, hint, manual_name);
 
-    auto res = animPickerButton(char_file, hkparam.text().as_string());
-    if (res.has_value())
+    if (auto res = animPickerButton("picker", char_file, hkparam.text().as_string()); res.has_value())
         hkparam.text() = res.value().data();
 
     ImGui::PopID();
@@ -814,27 +810,18 @@ void stateEdit(pugi::xml_node      hkparam,
                std::string_view    hint,
                std::string_view    manual_name)
 {
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
     intScalarEdit(hkparam, file, 4, hint, manual_name);
     if (getParentObj(hkparam).getByName("variableBindingSet"))
         ImGui::SameLine();
 
-    if (ImGui::Button(ICON_FA_SEARCH))
-        ImGui::OpenPopup("select state");
-    addTooltip("Select");
-
-    if (state_machine)
+    auto res = statePickerButton("select state", state_machine, file, hkparam.text().as_int());
+    if (res.has_value())
+        hkparam.text() = res.value().getByName("stateId").text().as_string();
+    if (auto state = getStateById(state_machine, hkparam.text().as_int(), file); state)
     {
-        statePickerPopup("select state", hkparam, state_machine, file);
-        if (auto state = getStateById(state_machine, hkparam.text().as_int(), file); state)
-        {
-            ImGui::SameLine();
-            ImGui::TextUnformatted(state.getByName("name").text().as_string());
-        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(state.getByName("name").text().as_string());
     }
-
-    ImGui::PopID();
 }
 
 void boneEdit(pugi::xml_node      hkparam,
@@ -843,17 +830,13 @@ void boneEdit(pugi::xml_node      hkparam,
               std::string_view    hint,
               std::string_view    manual_name)
 {
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
     intScalarEdit(hkparam, file, ImGuiDataType_S16, hint, manual_name);
     if (getParentObj(hkparam).getByName("variableBindingSet"))
         ImGui::SameLine();
 
-    auto picked_bone = bonePickerButton(skel_file, hkparam.text().as_int());
+    auto picked_bone = bonePickerButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), skel_file, hkparam.text().as_int());
     if (picked_bone.has_value())
         hkparam.text() = picked_bone.value();
-
-    ImGui::PopID();
 }
 
 ////////////////    Linked Prop Edits

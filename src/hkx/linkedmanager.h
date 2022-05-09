@@ -11,6 +11,7 @@
 #include <tuple>
 
 #include <pugixml.hpp>
+#include <fmt/format.h>
 
 namespace Haviour
 {
@@ -62,6 +63,7 @@ public:
     constexpr pugi::xml_node get() { return m_props[getTypeIndex<T, Props...>()]; }
 
     std::enable_if_t<IsContained<PropName, Props...>::value, const char*> getName() { return get<PropName>().text().as_string(); }
+    std::enable_if_t<IsContained<PropName, Props...>::value, std::string> getItemName() { return fmt::format("{:4} {}", m_index, getName()); }
 
     static LinkedPropertyEntry<Props...> create(NodeArray& containers)
     {

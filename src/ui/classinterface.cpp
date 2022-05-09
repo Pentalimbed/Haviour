@@ -665,8 +665,8 @@ UICLASS(hkbBlenderGenerator)
             intScalarEdit(obj.getByName("indexOfSyncMasterChild"), file, ImGuiDataType_S16,
                           "If you want a particular child's duration to be used to sync all of the other children, set this to the index of the child.\n"
                           "Otherwise, set it to -1.");
-            flagEdit(obj.getByName("flags"), Hkx::f_hkbBlenderGenerator_BlenderFlags,
-                     "The flags affecting specialized behavior.", "", true);
+            flagEdit<true>(obj.getByName("flags"), Hkx::f_hkbBlenderGenerator_BlenderFlags,
+                           "The flags affecting specialized behavior.", "");
             boolEdit(obj.getByName("subtractLastChild"), file,
                      "If this is set to true then the last child will be a subtracted from the blend of the rest");
 
@@ -802,7 +802,6 @@ UICLASS(hkbBoneIndexArray)
         if (ImGui::InputTextMultiline(bone_indices.attribute("name").as_string(), &value))
             bone_indices.text() = value.c_str();
 
-
         ImGui::TableNextColumn();
 
         ImGui::EndTable();
@@ -840,7 +839,8 @@ UICLASS(hkbBoneIndexArray)
             ImGui::TableNextColumn();
             ImGui::InputScalar(fmt::format("{}", i).c_str(), ImGuiDataType_S16, &bone_idxs[i]);
             ImGui::TableNextColumn();
-            bonePickerButton(skel_file, bone_idxs[i]);
+            if (auto res = bonePickerButton("picker", skel_file, bone_idxs[i]); res.has_value())
+                bone_idxs[i] = res.value();
             ImGui::PopID();
         }
         ImGui::EndTable();

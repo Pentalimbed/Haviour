@@ -122,7 +122,7 @@ public:
 
     void reindexVariables();
     void reindexEvents();
-    void reindexProperties();
+    void reindexProps();
 
     // removed unreferenced
     void cleanupVariables();
@@ -139,6 +139,7 @@ class SkeletonFile : public HkxFile
 public:
     void loadFile(std::string_view path);
 
+    inline pugi::xml_node   getBoneNode(bool ragdoll = false) { return (ragdoll ? m_skel_rag_obj : m_skel_obj).getByName("bones"); }
     void                    getBoneList(std::vector<std::string_view>& out, bool ragdoll = false);
     inline std::string_view getBone(size_t idx, bool ragdoll = false)
     {
@@ -165,9 +166,8 @@ public:
 
     inline pugi::xml_node getAnimNames() { return m_anim_name_node; }
 
-private:
     VariableManager m_prop_manager; // naming a bit confusing but charprops are essentially variables in character files
-
+private:
     pugi::xml_node m_anim_name_node;
     pugi::xml_node m_char_data_obj, m_char_str_data_obj, m_var_value_obj;
 };

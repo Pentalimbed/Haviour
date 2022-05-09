@@ -19,4 +19,5 @@ set(headers
 	src/ui/propedit.h
 	src/ui/columnview.h
 	src/ui/macros.h
+	src/ui/charedit.h
 )

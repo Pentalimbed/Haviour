@@ -16,4 +16,5 @@ set(sources
 	src/ui/propedit.cpp
 	src/ui/columnview.cpp
 	src/ui/macros.cpp
+	src/ui/charedit.cpp
 )

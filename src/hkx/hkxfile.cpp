@@ -408,7 +408,7 @@ void BehaviourFile::loadFile(std::string_view path)
 void BehaviourFile::saveFile(std::string_view path)
 {
     reindexEvents();
-    reindexProperties();
+    reindexProps();
     reindexVariables();
 
     HkxFile::saveFile(path);
@@ -474,7 +474,7 @@ void BehaviourFile::reindexEvents()
     walker.m_remap = &remap;
     m_data_node.traverse(walker);
 }
-void BehaviourFile::reindexProperties()
+void BehaviourFile::reindexProps()
 {
     auto remap = m_prop_manager.reindex();
 

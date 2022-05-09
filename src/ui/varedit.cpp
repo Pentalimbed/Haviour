@@ -274,7 +274,7 @@ void VarEdit::showPropList()
     addTooltip("Remove unused properties (USE WITH CAUTION!)");
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
-        current_file.reindexProperties();
+        current_file.reindexProps();
     addTooltip("Reindex properties\nDiscard all events properties obsolete");
 
     ImGui::InputText("Filter", &m_prop_filter);

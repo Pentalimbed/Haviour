@@ -16,6 +16,39 @@ struct EnumWrapper
     uint32_t         val  = 0;
 };
 
+template <size_t N>
+uint32_t str2FlagVal(std::string_view str, const std::array<EnumWrapper, N>& flags)
+{
+    uint32_t retval = 0;
+    for (auto flag : flags)
+        if (flag.val && str.contains(flag.name))
+            retval |= flag.val;
+    return retval;
+}
+
+template <size_t N>
+std::string flagVal2Str(uint32_t value, const std::array<EnumWrapper, N>& flags)
+{
+    std::string value_text = {};
+    for (auto flag : flags)
+        if (value & flag.val)
+            value_text = fmt::format("{}{}|", value_text, flag.name);
+    if (value_text.ends_with('|'))
+        value_text.pop_back();
+    return value_text;
+}
+
+// filtering
+inline bool strCaseContains(std::string_view str, std::string_view target)
+{
+    return !std::ranges::search(str, target, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty();
+}
+
+inline bool hasText(std::string_view str, std::string_view filter_str)
+{
+    return filter_str.empty() || strCaseContains(str, filter_str);
+}
+
 // get index of template argument
 // source: https://stackoverflow.com/questions/15014096/c-index-of-type-during-variadic-template-expansion
 template <typename Target, typename ListHead, typename... ListTails>

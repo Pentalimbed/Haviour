@@ -3,6 +3,8 @@
 #pragma once
 #include "hkx/hkxfile.h"
 
+#include <type_traits>
+
 #include <fmt/format.h>
 #include <pugixml.hpp>
 #include <imgui.h>
@@ -26,6 +28,23 @@ const auto g_color_float   = ImColor(0xF6, 0x6f, 0x9a).Value;
 const auto g_color_attr    = ImColor(0x9d, 0x00, 0x1c).Value;
 const auto g_color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
 
+inline ImVec4 getVarColor(Hkx::Variable& var)
+{
+    auto var_type_enum = Hkx::getVarTypeEnum(var.get<Hkx::PropVarInfo>().getByName("type").text().as_string());
+    if (var_type_enum < 0)
+        return g_color_invalid;
+    else if (var_type_enum < 1)
+        return g_color_bool;
+    else if (var_type_enum < 4)
+        return g_color_int;
+    else if (var_type_enum < 5)
+        return g_color_float;
+    else if (var_type_enum < 6)
+        return g_color_attr;
+    else
+        return g_color_quad;
+}
+
 #define copyableText(text, ...)                \
     ImGui::TextUnformatted(text, __VA_ARGS__); \
     addTooltip("Left click to copy text");     \
@@ -35,157 +54,175 @@ const auto g_color_quad    = ImColor(0x5a, 0xe6, 0xb8).Value;
 #define addTooltip(...) \
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
 
-template <typename Manager>
-std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id,
-                                                             Manager&    prop_manager,
-                                                             bool        set_focus)
+// Listbox with clipping and custom item widget function
+// This function returns selected index if selected
+// item function should return true if selected
+template <typename T>
+std::optional<int> pickerListBox(const char* label, ImVec2 size, std::vector<T>& items, std::function<bool(T&)> item_func)
 {
-    static bool        need_update = true;
-    static std::string search_text;
-
-    if (ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
+    if (ImGui::BeginListBox(label, size))
     {
-        if (set_focus)
-            ImGui::SetKeyboardFocusHere();
-        ImGui::InputText("Filter", &search_text);
+        ImGuiListClipper clipper;
+        clipper.Begin(items.size());
 
-        ImGui::Separator();
-
-        auto prop_list = prop_manager.getEntryList();
-        std::erase_if(prop_list,
-                      [=](auto& prop) {
-                          auto prop_disp_name = std::format("{:4} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string()); // :3
-                          return !(prop.m_valid &&
-                                   (search_text.empty() ||
-                                    !std::ranges::search(prop_disp_name, search_text, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
-                      });
-
-        ImGui::BeginChild("ITEMS", {400.0f, 20.0f * std::min(prop_list.size(), 30ull)}, false);
-        {
-            ImGuiListClipper clipper;
-            clipper.Begin(prop_list.size());
-            while (clipper.Step())
-                for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+        while (clipper.Step())
+            for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+            {
+                if (item_func(items[row_n]))
                 {
-                    auto& prop = prop_list[row_n];
-
-                    if (prop.m_valid)
-                    {
-                        auto prop_disp_name = fmt::format("{:4} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string());
-
-                        if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
-                        {
-                            auto var_type      = prop.get<Hkx::PropVarInfo>().getByName("type").text().as_string();
-                            auto var_type_enum = Hkx::getVarTypeEnum(var_type);
-                            if (var_type_enum < 0)
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_invalid);
-                            else if (var_type_enum < 1)
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_bool);
-                            else if (var_type_enum < 4)
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_int);
-                            else if (var_type_enum < 5)
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_float);
-                            else if (var_type_enum < 6)
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_attr);
-                            else
-                                ImGui::PushStyleColor(ImGuiCol_Text, g_color_quad);
-                        }
-
-                        if (ImGui::Selectable(prop_disp_name.c_str()))
-                        {
-                            if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
-                                ImGui::PopStyleColor();
-                            ImGui::CloseCurrentPopup();
-                            ImGui::EndPopup();
-                            return prop;
-                        }
-
-                        if constexpr (std::is_same_v<Manager::Entry, Hkx::Variable>)
-                            ImGui::PopStyleColor();
-                    }
+                    ImGui::EndListBox();
+                    return row_n;
                 }
-        }
-        ImGui::EndChild();
-
-        ImGui::EndPopup();
+            }
+        ImGui::EndListBox();
     }
-
     return std::nullopt;
 }
 
-template <size_t N>
-void flagPopup(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
+// pickerListBox + filter
+// filter function returns true if item should remain
+template <typename T>
+std::optional<T> filteredPickerListBox(const char*                               label,
+                                       std::vector<T>&                           items,
+                                       std::function<bool(T&, std::string_view)> filter_func,
+                                       std::function<bool(T&)>                   item_func)
 {
-    std::string value_text = hkparam.text().as_string();
-    uint32_t    value      = 0;
-    if (ImGui::BeginPopup(str_id))
+    static std::string filter_text = {};
+    ImGui::InputText("Filter", &filter_text);
+
+    std::vector<T> items_filtered = {};
+    for (auto& item : items)
+        if (filter_func(item, filter_text))
+            items_filtered.push_back(item);
+
+    if (items_filtered.empty())
+        ImGui::TextDisabled("No item");
+    else if (auto res = pickerListBox(label, {400.0f, 21.0f * std::min(items_filtered.size(), 30ull)}, items_filtered, item_func); res.has_value())
+        return items[res.value()];
+    return std::nullopt;
+}
+
+template <typename T>
+std::optional<T> pickerPopup(const char*                               str_id,
+                             std::vector<T>&                           items,
+                             std::function<bool(T&, std::string_view)> filter_func,
+                             std::function<bool(T&)>                   item_func,
+                             bool                                      just_open)
+{
+    if (ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar))
     {
-        bool value_changed = false;
-        for (EnumWrapper flag : flags)
-        {
-            if (flag.val && value_text.contains(flag.name))
-                value |= flag.val;
-        }
-        for (EnumWrapper flag : flags)
+        if (just_open)
+            ImGui::SetKeyboardFocusHere(); // set focus to keyboard
+        auto res = filteredPickerListBox(fmt::format("##{}", str_id).c_str(), items, filter_func, item_func);
+        if (res.has_value())
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return res;
+    }
+    return std::nullopt;
+}
+
+template <typename Entry>
+bool linkedPropSelectable(Entry& prop)
+{
+    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+        ImGui::PushStyleColor(ImGuiCol_Text, getVarColor(prop));
+    if (ImGui::Selectable(prop.getItemName().c_str()))
+    {
+        if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+            ImGui::PopStyleColor();
+        return true;
+    }
+    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+        ImGui::PopStyleColor();
+    return false;
+};
+
+template <typename Manager>
+std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id, Manager& prop_manager, bool just_open)
+{
+    using Entry = typename Manager::Entry;
+
+    auto entries = prop_manager.getEntryList();
+    return pickerPopup<Entry>(
+        str_id, entries,
+        [](Entry& prop, std::string_view filter_str) { return hasText(prop.getItemName(), filter_str); },
+        linkedPropSelectable<Entry>,
+        just_open);
+}
+
+// very ugly, but templates just don't fucking works
+#define pickerButton(func, ...)                        \
+    ImGui::PushID(str_id);                             \
+    bool open = false;                                 \
+    if (ImGui::Button(ICON_FA_SEARCH))                 \
+    {                                                  \
+        open = true;                                   \
+        ImGui::OpenPopup("select prop");               \
+    }                                                  \
+    auto res = func("select prop", __VA_ARGS__, open); \
+    ImGui::PopID();                                    \
+    return res;
+
+template <typename Manager>
+std::optional<typename Manager::Entry> linkedPropPickerButton(const char* str_id, Manager& prop_manager)
+{
+    pickerButton(linkedPropPickerPopup, prop_manager);
+}
+
+template <bool as_int, size_t N>
+void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
+{
+    ImGui::PushID(str_id);
+
+    if (ImGui::Button(ICON_FA_FLAG))
+        ImGui::OpenPopup("edit flags");
+
+    if (ImGui::BeginPopup("edit flags"))
+    {
+        uint32_t value;
+
+        if constexpr (as_int)
+            value = hkparam.text().as_uint();
+        else
+            value = str2FlagVal(hkparam.text().as_string(), flags);
+
+        for (auto& flag : flags)
             if (flag.val)
             {
                 if (ImGui::CheckboxFlags(flag.name.data(), &value, flag.val))
-                    value_changed = true;
+                {
+                    if constexpr (as_int)
+                        hkparam.text() = value;
+                    else
+                        hkparam.text() = flagVal2Str(value, flags).c_str();
+                }
                 if (!flag.hint.empty())
                     addTooltip(flag.hint.data());
             }
-        if (value_changed)
-        {
-            value_text = {};
-            if (!value) value_text = "0";
-            else
-            {
-                for (EnumWrapper flag : flags)
-                    if (value & flag.val)
-                        value_text.append(fmt::format("{}|", flag.name));
-                if (value_text.ends_with('|'))
-                    value_text.pop_back();
-            }
-            hkparam.text() = value_text.c_str();
-        }
         ImGui::EndPopup();
     }
+
+    ImGui::PopID();
 }
 
-template <size_t N>
-void flagIntPopup(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
+std::optional<pugi::xml_node>        statePickerPopup(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id, bool just_open);
+inline std::optional<pugi::xml_node> statePickerButton(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id)
 {
-    uint32_t value = hkparam.text().as_uint();
-    if (ImGui::BeginPopup(str_id))
-    {
-        for (EnumWrapper flag : flags)
-            if (flag.val)
-            {
-                ImGui::CheckboxFlags(flag.name.data(), &value, flag.val);
-                if (!flag.hint.empty())
-                    addTooltip(flag.hint.data());
-            }
-        hkparam.text() = value;
-        ImGui::EndPopup();
-    }
+    pickerButton(statePickerPopup, state_machine, file, selected_state_id);
 }
 
-template <size_t N>
-void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, bool as_int = false)
+std::optional<int16_t>        bonePickerPopup(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id, bool just_open);
+inline std::optional<int16_t> bonePickerButton(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id)
 {
-    if (as_int)
-        flagIntPopup(str_id, hkparam, flags);
-    else
-        flagPopup(str_id, hkparam, flags);
-    if (ImGui::Button(ICON_FA_FLAG))
-        ImGui::OpenPopup(str_id);
-    addTooltip("Edit individual flags");
+    pickerButton(bonePickerPopup, skel_file, selected_bone_id);
 }
 
-void statePickerPopup(const char* str_id, pugi::xml_node hkparam, pugi::xml_node state_machine, Hkx::BehaviourFile& file);
-
-std::optional<int16_t> bonePickerButton(Hkx::SkeletonFile& skel_file, int16_t value);
-
+std::optional<std::string_view>        animPickerPopup(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim, bool just_open);
+inline std::optional<std::string_view> animPickerButton(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim)
+{
+    pickerButton(animPickerPopup, char_file, selected_anim);
+}
 std::optional<std::string_view> animPickerButton(Hkx::CharacterFile& char_file, std::string_view value);
 
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file);
@@ -250,14 +287,17 @@ void intScalarEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, ImGuiDataTy
 //                    std::string_view hint        = {},
 //                    std::string_view manual_name = {});
 
-template <size_t N>
-void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {}, bool as_int = false)
+template <bool as_int, size_t N>
+void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {})
 {
     stringEdit(hkparam, hint, manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
+    flagEditButton<as_int>("Edit flags", hkparam, flags);
+}
 
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-    flagEditButton("Edit flags", hkparam, flags, as_int);
-    ImGui::PopID();
+template <size_t N>
+void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {})
+{
+    flagEdit<false>(hkparam, flags, hint, manual_name);
 }
 
 template <typename Manager>
@@ -270,27 +310,9 @@ void linkedPropPickerEdit(pugi::xml_node      hkparam,
     intScalarEdit(hkparam, file, ImGuiDataType_S32, hint, manual_name);
     if (getParentObj(hkparam).getByName("variableBindingSet"))
         ImGui::SameLine();
-
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
-    bool set_focus = false;
-    if (ImGui::Button(ICON_FA_SEARCH))
-    {
-        set_focus = true;
-        ImGui::OpenPopup("PickProp");
-    }
-    addTooltip("Select");
-    if (hkparam.text().as_int() >= 0)
-    {
-        ImGui::SameLine();
-        ImGui::TextUnformatted(prop_manager.getEntry(hkparam.text().as_ullong()).getName());
-    }
-
-    // POPUP
-    if (auto out_prop = linkedPropPickerPopup("PickProp", prop_manager, set_focus); out_prop.has_value())
-        hkparam.text() = out_prop.value().m_index;
-
-    ImGui::PopID();
+    auto res = linkedPropPickerButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), prop_manager);
+    if (res.has_value())
+        hkparam.text() = res.value().m_index;
 }
 
 void sliderFloatEdit(pugi::xml_node      hkparam,
