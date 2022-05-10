@@ -21,6 +21,32 @@ VariableTypeEnum getVarTypeEnum(std::string_view enumstr);
 
 namespace Ui
 {
+// get type from imgui datatype enum
+template <ImGuiDataType data_type>
+constexpr auto imgui_type()
+{
+    if constexpr (data_type == ImGuiDataType_S8)
+        return int8_t();
+    else if constexpr (data_type == ImGuiDataType_S16)
+        return int16_t();
+    else if constexpr (data_type == ImGuiDataType_S32)
+        return int32_t();
+    else if constexpr (data_type == ImGuiDataType_S64)
+        return int64_t();
+    else if constexpr (data_type == ImGuiDataType_U8)
+        return uint8_t();
+    else if constexpr (data_type == ImGuiDataType_U16)
+        return uint16_t();
+    else if constexpr (data_type == ImGuiDataType_U32)
+        return uint32_t();
+    else if constexpr (data_type == ImGuiDataType_U64)
+        return uint64_t();
+    else if constexpr (data_type == ImGuiDataType_Float)
+        return float();
+}
+template <ImGuiDataType data_type>
+using imgui_type_t = decltype(imgui_type<data_type>());
+
 const auto g_color_invalid = ImColor(0.2f, 0.2f, 0.2f).Value;
 const auto g_color_bool    = ImColor(0xFF, 0x9C, 0x83).Value;
 const auto g_color_int     = ImColor(0x07, 0xd2, 0xd9).Value;
@@ -53,6 +79,20 @@ inline ImVec4 getVarColor(Hkx::Variable& var)
 
 #define addTooltip(...) \
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
+
+inline void fullTableSeparator()
+{
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    while (ImGui::TableGetColumnIndex() < ImGui::TableGetColumnCount() - 1)
+    {
+        ImGui::Separator();
+        ImGui::TableNextColumn();
+    }
+    ImGui::Separator();
+}
+
+///////////////////////// PICKERS
 
 // Listbox with clipping and custom item widget function
 // This function returns selected index if selected
@@ -138,18 +178,20 @@ bool linkedPropSelectable(Entry& prop)
     return false;
 };
 
-template <typename Manager>
-std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id, Manager& prop_manager, bool just_open)
-{
-    using Entry = typename Manager::Entry;
-
-    auto entries = prop_manager.getEntryList();
-    return pickerPopup<Entry>(
-        str_id, entries,
-        [](Entry& prop, std::string_view filter_str) { return hasText(prop.getItemName(), filter_str); },
-        linkedPropSelectable<Entry>,
-        just_open);
-}
+// template <auto fn, typename... Args>
+// typename std::invoke_result_t<decltype(fn), const char*, Args..., bool> pickerButton(const char* str_id, Args... args)
+// {
+//     ImGui::PushID(str_id);
+//     bool open = false;
+//     if (ImGui::Button(ICON_FA_SEARCH))
+//     {
+//         open = true;
+//         ImGui::OpenPopup("select prop");
+//     }
+//     auto res = func("select prop", std::forward<Args>(args)..., open);
+//     ImGui::PopID();
+//     return res;
+// }
 
 // very ugly, but templates just don't fucking works
 #define pickerButton(func, ...)                        \
@@ -165,10 +207,42 @@ std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id,
     return res;
 
 template <typename Manager>
+std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id, Manager& prop_manager, bool just_open)
+{
+    using Entry = typename Manager::Entry;
+
+    auto entries = prop_manager.getEntryList();
+    return pickerPopup<Entry>(
+        str_id, entries,
+        [](Entry& prop, std::string_view filter_str) { return hasText(prop.getItemName(), filter_str); },
+        linkedPropSelectable<Entry>,
+        just_open);
+}
+template <typename Manager>
 std::optional<typename Manager::Entry> linkedPropPickerButton(const char* str_id, Manager& prop_manager)
 {
     pickerButton(linkedPropPickerPopup, prop_manager);
 }
+
+std::optional<pugi::xml_node>        statePickerPopup(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id, bool just_open);
+inline std::optional<pugi::xml_node> statePickerButton(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id)
+{
+    pickerButton(statePickerPopup, state_machine, file, selected_state_id);
+}
+
+std::optional<int16_t>        bonePickerPopup(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id, bool just_open);
+inline std::optional<int16_t> bonePickerButton(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id)
+{
+    pickerButton(bonePickerPopup, skel_file, selected_bone_id);
+}
+
+std::optional<std::string_view>        animPickerPopup(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim, bool just_open);
+inline std::optional<std::string_view> animPickerButton(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim)
+{
+    pickerButton(animPickerPopup, char_file, selected_anim);
+}
+
+///////////////////////// OTHER BUTTONS
 
 template <bool as_int, size_t N>
 void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
@@ -205,137 +279,274 @@ void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array
 
     ImGui::PopID();
 }
-
-std::optional<pugi::xml_node>        statePickerPopup(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id, bool just_open);
-inline std::optional<pugi::xml_node> statePickerButton(const char* str_id, pugi::xml_node state_machine, Hkx::HkxFile& file, int selected_state_id)
+template <auto& flags>
+bool flagEditButton(const char* str_id, uint32_t& value)
 {
-    pickerButton(statePickerPopup, state_machine, file, selected_state_id);
-}
+    ImGui::PushID(str_id);
 
-std::optional<int16_t>        bonePickerPopup(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id, bool just_open);
-inline std::optional<int16_t> bonePickerButton(const char* str_id, Hkx::SkeletonFile& skel_file, int16_t selected_bone_id)
-{
-    pickerButton(bonePickerPopup, skel_file, selected_bone_id);
-}
+    bool res = false;
+    if (ImGui::Button(ICON_FA_FLAG))
+        ImGui::OpenPopup("edit flags");
+    addTooltip("Edit individual flags");
+    if (ImGui::BeginPopup("edit flags"))
+    {
+        for (auto& flag : flags)
+            if (flag.val)
+            {
+                if (ImGui::CheckboxFlags(flag.name.data(), &value, flag.val))
+                    res = true;
+                if (!flag.hint.empty())
+                    addTooltip(flag.hint.data());
+            }
+        ImGui::EndPopup();
+    }
 
-std::optional<std::string_view>        animPickerPopup(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim, bool just_open);
-inline std::optional<std::string_view> animPickerButton(const char* str_id, Hkx::CharacterFile& char_file, std::string_view selected_anim)
-{
-    pickerButton(animPickerPopup, char_file, selected_anim);
+    ImGui::PopID();
+
+    return res;
 }
-std::optional<std::string_view> animPickerButton(Hkx::CharacterFile& char_file, std::string_view value);
 
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file);
+void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile* file);
 
-////////////////    EDITS
-inline void fullTableSeparator()
+////////////////    hkParam Edits
+
+#define DEF_FACT_MEM(type, name, def_val) \
+    type  m_##name = def_val;             \
+    auto& name(type name)                 \
+    {                                     \
+        m_##name = name;                  \
+        return *this;                     \
+    }
+
+#define DEF_EDIT_CONSTR(derived, base)      \
+    derived() = default;                    \
+    inline derived(                         \
+        pugi::xml_node      hkparam,        \
+        Hkx::BehaviourFile* file = nullptr, \
+        std::string_view    hint = {},      \
+        std::string_view    name = {}) :       \
+        base(hkparam, file, hint, name) {}  \
+    inline derived(                         \
+        pugi::xml_node      hkparam,        \
+        Hkx::BehaviourFile& file,           \
+        std::string_view    hint = {},      \
+        std::string_view    name = {}) :       \
+        derived(hkparam, &file, hint, name) {}
+
+struct ParamEdit
 {
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    while (ImGui::TableGetColumnIndex() < ImGui::TableGetColumnCount() - 1)
+    DEF_FACT_MEM(pugi::xml_node, hkparam, {})
+    DEF_FACT_MEM(Hkx::BehaviourFile*, file, nullptr) // for binding
+    DEF_FACT_MEM(std::string_view, hint, {})
+    DEF_FACT_MEM(std::string_view, name, {})
+
+    virtual inline const char* getName() { return m_name.empty() ? m_hkparam.attribute("name").as_string() : m_name.data(); }
+    virtual inline void        show()
     {
-        ImGui::Separator();
+        fetchValue();
+
         ImGui::TableNextColumn();
+        auto update = showEdit();
+        if (!m_hint.empty())
+            addTooltip(m_hint.data());
+        ImGui::TableNextColumn();
+        update |= showButton();
+
+        if (update)
+            updateValue();
     }
-    ImGui::Separator();
-}
+    virtual bool showEdit() = 0;    // edit internal value, return true if value edited
+    virtual bool showButton();      // return true if value edited
+    virtual void fetchValue()  = 0; // update internal value from hkparam
+    virtual void updateValue() = 0; // update hkparam with new value
 
-void stringEdit(pugi::xml_node   hkparam,
-                std::string_view hint        = {},
-                std::string_view manual_name = {});
+    ParamEdit() = default;
+    inline ParamEdit(pugi::xml_node hkparam, Hkx::BehaviourFile* file = nullptr, std::string_view hint = {}, std::string_view name = {}) :
+        m_hkparam(hkparam), m_file(file), m_hint(hint), m_name(name){};
+    inline ParamEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, std::string_view hint = {}, std::string_view name = {}) :
+        ParamEdit(hkparam, &file, hint, name){};
 
-void animEdit(pugi::xml_node      hkparam,
-              Hkx::CharacterFile& char_file,
-              std::string_view    hint        = {},
-              std::string_view    manual_name = {});
+    virtual inline void operator()() { show(); }
+};
 
-void boolEdit(pugi::xml_node      hkparam,
-              Hkx::BehaviourFile& file,
-              std::string_view    hint        = {},
-              std::string_view    manual_name = {});
-
-template <size_t N>
-void enumEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& enums, std::string_view hint = {}, std::string_view manual_name = {})
+struct BoolEdit : public ParamEdit
 {
-    ImGui::TableNextColumn();
-    std::string value = hkparam.text().as_string();
-    if (ImGui::BeginCombo(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), value.c_str()))
+    bool         m_value;
+    virtual void fetchValue() override;
+    virtual void updateValue() override;
+    virtual bool showEdit() override;
+    DEF_EDIT_CONSTR(BoolEdit, ParamEdit)
+};
+
+struct QuadEdit : public ParamEdit
+{
+    float        m_value[4];
+    virtual void fetchValue() override;
+    virtual void updateValue() override;
+    virtual bool showEdit() override;
+    DEF_EDIT_CONSTR(QuadEdit, ParamEdit)
+};
+
+// scalar based
+template <ImGuiDataType data_type = ImGuiDataType_Float>
+struct ScalarEdit : public ParamEdit
+{
+    imgui_type_t<data_type> m_value;
+    virtual void            fetchValue() override
     {
-        for (EnumWrapper enum_wrapper : enums)
-        {
-            const bool is_selected = value == enum_wrapper.name;
-            if (ImGui::Selectable(enum_wrapper.name.data(), is_selected))
-                hkparam.text().set(enum_wrapper.name.data());
-            if (!enum_wrapper.hint.empty())
-                addTooltip(enum_wrapper.hint.data());
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
+        if constexpr (data_type == ImGuiDataType_S8 || data_type == ImGuiDataType_S16 || data_type == ImGuiDataType_S32 || data_type == ImGuiDataType_S64)
+            m_value = m_hkparam.text().as_llong();
+        else if constexpr (data_type == ImGuiDataType_U8 || data_type == ImGuiDataType_U16 || data_type == ImGuiDataType_U32 || data_type == ImGuiDataType_U64)
+            m_value = m_hkparam.text().as_ullong();
+        else if constexpr (data_type == ImGuiDataType_Float)
+            m_value = m_hkparam.text().as_float();
     }
-    else if (!hint.empty())
-        addTooltip(hint.data());
+    virtual void updateValue() override
+    {
+        if constexpr (data_type == ImGuiDataType_Float)
+            m_hkparam.text() = fmt::format("{:.6f}", m_value).c_str();
+        else
+            m_hkparam.text() = m_value;
+    }
+    virtual bool showEdit() override
+    {
+        constexpr auto format = (data_type == ImGuiDataType_Float) ? "%.6f" : nullptr;
+        return ImGui::InputScalar(getName(), data_type, &m_value, nullptr, nullptr, format);
+    }
+    DEF_EDIT_CONSTR(ScalarEdit, ParamEdit)
+};
 
-    ImGui::TableNextColumn();
-}
-
-void intScalarEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, ImGuiDataType data_type = ImGuiDataType_S32, std::string_view hint = {}, std::string_view manual_name = {});
-
-// void sliderIntEdit(pugi::xml_node   hkparam,
-//                    int              lb,
-//                    int              ub,
-//                    std::string_view hint        = {},
-//                    std::string_view manual_name = {});
-
-template <bool as_int, size_t N>
-void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {})
+template <ImGuiDataType data_type = ImGuiDataType_Float>
+struct SliderScalarEdit : public ScalarEdit<data_type>
 {
-    stringEdit(hkparam, hint, manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-    flagEditButton<as_int>("Edit flags", hkparam, flags);
-}
+    DEF_FACT_MEM(imgui_type_t<data_type>, lb, 0.0f)
+    DEF_FACT_MEM(imgui_type_t<data_type>, ub, 100.0f)
+    virtual bool showEdit() override
+    {
+        constexpr auto format = (data_type == ImGuiDataType_Float) ? "%.6f" : nullptr;
+        return ImGui::SliderScalar(ParamEdit::getName(), data_type,
+                                   std::addressof(ScalarEdit<data_type>::m_value), // CPP IS STUPID
+                                   &m_lb, &m_ub, format);
+    }
+    DEF_EDIT_CONSTR(SliderScalarEdit, ScalarEdit<data_type>)
+};
 
-template <size_t N>
-void flagEdit(pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags, std::string_view hint = {}, std::string_view manual_name = {})
+struct FloatAsIntEdit : public ScalarEdit<ImGuiDataType_Float>
 {
-    flagEdit<false>(hkparam, flags, hint, manual_name);
-}
+    virtual void fetchValue() override;
+    virtual void updateValue() override;
+    DEF_EDIT_CONSTR(FloatAsIntEdit, ScalarEdit<ImGuiDataType_Float>)
+};
+
+template <auto& flags>
+struct FlagAsIntEdit : public ScalarEdit<ImGuiDataType_U32>
+{
+    virtual bool showButton() override
+    {
+        ParamEdit::showButton();
+        ImGui::SameLine();
+        return flagEditButton<flags>(getName(), m_value);
+    }
+    DEF_EDIT_CONSTR(FlagAsIntEdit, ScalarEdit<ImGuiDataType_U32>)
+};
 
 template <typename Manager>
-void linkedPropPickerEdit(pugi::xml_node      hkparam,
-                          Hkx::BehaviourFile& file,
-                          Manager&            prop_manager,
-                          std::string_view    hint        = {},
-                          std::string_view    manual_name = {})
+struct LinkedPropPickerEdit : public ScalarEdit<ImGuiDataType_S32>
 {
-    intScalarEdit(hkparam, file, ImGuiDataType_S32, hint, manual_name);
-    if (getParentObj(hkparam).getByName("variableBindingSet"))
+    DEF_FACT_MEM(Manager*, manager, nullptr)
+    virtual bool showButton() override
+    {
+        ParamEdit::showButton();
         ImGui::SameLine();
-    auto res = linkedPropPickerButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), prop_manager);
-    if (res.has_value())
-        hkparam.text() = res.value().m_index;
-}
+        auto res = linkedPropPickerButton(getName(), *m_manager);
+        if (res.has_value())
+            m_value = res.value().m_index;
+        if (auto prop = m_manager->getEntry(m_value); prop.m_valid)
+        {
+            ImGui::SameLine();
+            ImGui::TextUnformatted(prop.getName());
+        }
+        return res.has_value();
+    }
+    DEF_EDIT_CONSTR(LinkedPropPickerEdit, ScalarEdit<ImGuiDataType_S32>)
+};
+using EvtPickerEdit  = LinkedPropPickerEdit<Hkx::AnimationEventManager>;
+using VarPickerEdit  = LinkedPropPickerEdit<Hkx::VariableManager>;
+using PropPickerEdit = LinkedPropPickerEdit<Hkx::CharacterPropertyManager>;
 
-void sliderFloatEdit(pugi::xml_node      hkparam,
-                     float               lb,
-                     float               ub,
-                     Hkx::BehaviourFile& file,
-                     std::string_view    hint        = {},
-                     std::string_view    manual_name = {});
+struct StateEdit : public ScalarEdit<ImGuiDataType_S32>
+{
+    DEF_FACT_MEM(pugi::xml_node, state_machine, {})
+    virtual bool showButton() override;
+    DEF_EDIT_CONSTR(StateEdit, ScalarEdit<ImGuiDataType_S32>)
+};
 
-void floatEdit(pugi::xml_node      hkparam,
-               Hkx::BehaviourFile& file,
-               std::string_view    hint        = {},
-               std::string_view    manual_name = {});
+struct BoneEdit : public ScalarEdit<ImGuiDataType_S16>
+{
+    virtual bool showButton() override;
+    DEF_EDIT_CONSTR(BoneEdit, ScalarEdit<ImGuiDataType_S16>)
+};
 
-// for floats written in UINT32 values
-void convertFloatEdit(pugi::xml_node   hkparam,
-                      std::string_view hint        = {},
-                      std::string_view manual_name = {});
+// string based
+struct StringEdit : public ParamEdit
+{
+    std::string  m_value;
+    virtual void fetchValue() override;
+    virtual void updateValue() override;
+    virtual bool showEdit() override;
+    DEF_EDIT_CONSTR(StringEdit, ParamEdit)
+};
 
-void quadEdit(pugi::xml_node      hkparam,
-              Hkx::BehaviourFile& file,
-              std::string_view    hint        = {},
-              std::string_view    manual_name = {});
+struct AnimEdit : public StringEdit
+{
+    virtual bool showButton() override;
+    DEF_EDIT_CONSTR(AnimEdit, StringEdit)
+};
+
+template <auto& enums> // should've add a requires to check for arrays but alas
+struct EnumEdit : public StringEdit
+{
+    virtual bool showEdit() override
+    {
+        if (ImGui::BeginCombo(getName(), m_value.data()))
+        {
+            for (auto& enum_wrapper : enums)
+            {
+                const bool is_selected = m_value == enum_wrapper.name;
+                if (ImGui::Selectable(enum_wrapper.name.data(), is_selected))
+                {
+                    ImGui::EndCombo();
+                    m_value = enum_wrapper.name;
+                    return true;
+                }
+                if (!enum_wrapper.hint.empty())
+                    addTooltip(enum_wrapper.hint.data());
+            }
+            ImGui::EndCombo();
+        }
+        return false;
+    }
+    DEF_EDIT_CONSTR(EnumEdit, StringEdit)
+};
+
+template <auto& flags>
+struct FlagEdit : public StringEdit
+{
+    virtual bool showButton() override
+    {
+        ParamEdit::showButton();
+        ImGui::SameLine();
+        auto int_value = str2FlagVal(m_hkparam.text().as_string(), flags);
+        auto res       = flagEditButton<flags>(getName(), int_value);
+        if (res)
+            m_value = flagVal2Str(int_value, flags);
+        return res;
+    }
+    DEF_EDIT_CONSTR(FlagEdit, StringEdit)
+};
+
+////////////////    HKPARARM EDITS
 
 void refEdit(pugi::xml_node                       hkparam,
              const std::vector<std::string_view>& classes, // should've used array but i don't wanna stuff too much templates here
@@ -373,12 +584,6 @@ void objLiveEditList(
     Hkx::BehaviourFile&                        file,
     std::string_view                           str_id,
     std::function<std::string(pugi::xml_node)> disp_name_func);
-
-void stateEdit(pugi::xml_node      hkparam,
-               Hkx::BehaviourFile& file,
-               pugi::xml_node      state_machine = {},
-               std::string_view    hint          = {},
-               std::string_view    manual_name   = {});
 
 void boneEdit(pugi::xml_node      hkparam,
               Hkx::BehaviourFile& file,

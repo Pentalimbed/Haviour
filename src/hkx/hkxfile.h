@@ -100,7 +100,6 @@ public:
     void loadFile(std::string_view path);
     void saveFile(std::string_view path = {});
 
-
     inline std::string_view getRootStateMachine()
     {
         return m_graph_obj.getByName("rootGenerator").text().as_string();
