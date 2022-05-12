@@ -21,8 +21,9 @@ void VarEdit::show()
     if (ImGui::Begin("Variable/Event List", &m_show, ImGuiWindowFlags_NoScrollbar))
     {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
-        if (auto file = file_manager->getCurrentFile(); file)
+        if (file_manager->isCurrentFileReady())
         {
+            auto file = file_manager->getCurrentFile();
             if (file->getType() == Hkx::HkxFile::kBehaviour)
             {
                 if (ImGui::BeginTable("varlisttbl", 2))

@@ -47,7 +47,7 @@ void HkxFile::loadFile(std::string_view path)
     for (auto hkobject = m_data_node.child("hkobject"); hkobject; hkobject = hkobject.next_sibling("hkobject"))
     {
         std::string name = hkobject.attribute("name").as_string();
-        if (name.empty() || (name.length() != 5) || !name.starts_with('#'))
+        if (name.empty() || !name.starts_with('#'))
         {
             file_logger->error("hkobject at location {} has no valid name.", hkobject.path());
             return;
@@ -68,6 +68,7 @@ void HkxFile::loadFile(std::string_view path)
         uint16_t id = std::atoi(name.data() + 1); // There's a potential crash here...
         m_latest_id = std::max(id, m_latest_id);
     }
+    reindexObjInternal(); // in case some file don't follow the 4 digit indexing
 
     m_loaded = true;
 }
@@ -256,16 +257,32 @@ void HkxFile::reindexObj(uint16_t start_id)
 
     file_logger->info("Attempting to reindex all objects...");
 
+    reindexObjInternal(start_id);
+
+    file_logger->info("All objects reindexed.");
+    HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
+}
+
+void HkxFile::reindexObjInternal(uint16_t start_id)
+{
     // get the id map
     StringMap<std::string> remap = {};
 
-    auto new_idx = start_id;
-    for (uint16_t i = 0; i <= m_latest_id; ++i)
-        if (auto old_id_str = fmt::format("#{:04}", i); m_obj_list.contains(old_id_str))
-        {
-            remap[old_id_str] = fmt::format("#{:04}", new_idx);
-            ++new_idx;
-        }
+    auto                     new_idx = start_id;
+    std::vector<std::string> obj_list;
+    getObjList(obj_list);
+    std::ranges::sort(obj_list);
+    for (auto& id : obj_list)
+    {
+        remap[id] = fmt::format("#{:04}", new_idx);
+        ++new_idx;
+    }
+    // for (uint16_t i = 0; i <= m_latest_id; ++i)
+    //     if (auto old_id_str = fmt::format("#{:04}", i); m_obj_list.contains(old_id_str))
+    //     {
+    //         remap[old_id_str] = fmt::format("#{:04}", new_idx);
+    //         ++new_idx;
+    //     }
     m_latest_id = new_idx - 1;
 
     // remap the lists
@@ -325,7 +342,14 @@ void HkxFile::reindexObj(uint16_t start_id)
                 while (pos != text.npos)
                 {
                     if (!pos || (text[pos - 1] != '&')) // in case html entity, fuck html entities
-                        text.replace(pos, 5, m_remap->at(std::string(&text[pos], 5)));
+                    {
+                        auto next_break = pos + 1;
+                        while ((next_break != text.size()) && (text[next_break] >= '0') && (text[next_break] <= '9')) ++next_break;
+                        auto rep_len = next_break - pos;
+                        text.replace(pos, rep_len, m_remap->at(std::string(&text[pos], rep_len)));
+                        pos = next_break;
+                    }
+
                     pos = text.find('#', pos + 1);
                 }
                 node.text() = text.c_str();
@@ -338,9 +362,6 @@ void HkxFile::reindexObj(uint16_t start_id)
 
     for (auto [key, obj] : m_obj_list)
         obj.attribute("name") = key.c_str();
-
-    file_logger->info("All objects reindexed.");
-    HkxFileManager::getSingleton()->dispatch(kEventObjChanged);
 }
 
 //////////////////// BEHAVIOUR
@@ -669,7 +690,7 @@ void HkxFileManager::loadFile(std::string_view path)
     file.loadFile(path);
     if (file.isFileLoaded())
     {
-        m_current_file = &m_files[m_files.size() - 1];
+        m_current_file = &m_files.back();
         dispatch(kEventFileChanged);
     }
     else

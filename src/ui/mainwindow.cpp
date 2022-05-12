@@ -207,9 +207,9 @@ void showMenuBar()
                 newFile();
             if (ImGui::MenuItem("Open", "CTRL+O"))
                 openFile();
-            if (ImGui::MenuItem("Save", "CTRL+S", false, file_manager->getCurrentFile() != nullptr))
+            if (ImGui::MenuItem("Save", "CTRL+S", false, file_manager->isCurrentFileReady()))
                 file_manager->saveFile();
-            if (ImGui::MenuItem("Save As", nullptr, false, file_manager->getCurrentFile() != nullptr))
+            if (ImGui::MenuItem("Save As", nullptr, false, file_manager->isCurrentFileReady()))
                 saveFileAs();
 
             ImGui::Separator();
@@ -220,7 +220,7 @@ void showMenuBar()
             else
                 for (int i = 0; i < path_list.size(); ++i)
                     if (ImGui::MenuItem(path_list[i].data(), nullptr,
-                                        (file_manager->getCurrentFile() != nullptr) && (path_list[i] == file_manager->getCurrentFile()->getPath())))
+                                        file_manager->isCurrentFileReady() && (path_list[i] == file_manager->getCurrentFile()->getPath())))
                         file_manager->setCurrentFile(i);
 
             ImGui::Separator();
@@ -278,9 +278,9 @@ void showMenuBar()
         }
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Build Reference List", nullptr, false, file_manager->getCurrentFile() != nullptr))
+            if (ImGui::MenuItem("Build Reference List", nullptr, false, file_manager->isCurrentFileReady()))
                 file_manager->getCurrentFile()->buildRefList();
-            if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->getCurrentFile() != nullptr))
+            if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->isCurrentFileReady()))
                 file_manager->getCurrentFile()->reindexObj();
             ImGui::EndMenu();
         }

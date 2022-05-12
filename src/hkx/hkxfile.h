@@ -100,6 +100,8 @@ protected:
     StringMap<std::vector<std::string>> m_obj_class_list;
     StringMap<StringSet>                m_obj_ref_list;
     StringMap<StringSet>                m_obj_ref_by_list;
+
+    void reindexObjInternal(uint16_t start_id = 100); // reindex w/o logging & event
 };
 
 // Single behaviour file
@@ -219,6 +221,7 @@ public:
             dispatch(kEventFileChanged);
     }
     inline HkxFile* getCurrentFile() { return m_current_file; }
+    inline bool     isCurrentFileReady() { return m_current_file && m_current_file->isFileLoaded(); }
 
     inline std::vector<std::string_view> getPathList()
     {

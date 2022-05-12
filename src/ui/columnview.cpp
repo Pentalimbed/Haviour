@@ -21,7 +21,7 @@ ColumnView::ColumnView()
 {
     auto file_manager = Hkx::HkxFileManager::getSingleton();
     m_file_listener   = file_manager->appendListener(Hkx::kEventFileChanged, [=]() {
-        if (file_manager->getCurrentFile())
+        if (file_manager->isCurrentFileReady())
             m_columns.push_back({});
     });
 

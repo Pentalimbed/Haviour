@@ -28,6 +28,10 @@
 - 0.5a ListView/PropEdit edit all kinds of hkx file (which they're supposed to but were not due to my stupidity)
 - 0.5a Scalar/Reference edit's width set to fixed
 
+- 0.5.1a Loading files that does not stick to 4 digit object indexing
+- 0.5.1a Blending transition hotfix
+- 0.5.1a Transition array hotfix
+
 Behaviour diagnosis
 Display names within the var/state/ref/evt edit when not editing (using combobox?)
 Editing character file (anim name & properties)

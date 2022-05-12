@@ -664,6 +664,7 @@ UICLASS(hkbBlendingTransitionEffect)
                                                        "Which blend curve to use.")();
         FlagEdit<Hkx::f_hkbBlendingTransitionEffect_FlagBits>(obj.getByName("flags"), file,
                                                               "Flags to indicate specialized behavior.")();
+        ImGui::EndTable();
     }
 }
 

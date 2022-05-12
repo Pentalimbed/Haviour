@@ -36,9 +36,9 @@ void ListView::show()
     if (ImGui::Begin("List View", &m_show))
     {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
-        if (auto file = file_manager->getCurrentFile(); file)
+        if (file_manager->isCurrentFileReady())
         {
-            auto& hkxfile = *file;
+            auto& hkxfile = *file_manager->getCurrentFile();
             if (ImGui::InputText("Filter", &m_filter))
                 updateCache();
             ImGui::SameLine();
@@ -107,7 +107,7 @@ void ListView::show()
 
 void ListView::updateCache(bool sort_only)
 {
-    if (!Hkx::HkxFileManager::getSingleton()->getCurrentFile())
+    if (!Hkx::HkxFileManager::getSingleton()->isCurrentFileReady())
         return;
     auto& hkxfile = *Hkx::HkxFileManager::getSingleton()->getCurrentFile();
     if (!sort_only)
