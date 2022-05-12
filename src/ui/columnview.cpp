@@ -21,7 +21,7 @@ ColumnView::ColumnView()
 {
     auto file_manager = Hkx::HkxFileManager::getSingleton();
     m_file_listener   = file_manager->appendListener(Hkx::kEventFileChanged, [=]() {
-        if (file_manager->isFileSelected())
+        if (file_manager->getCurrentFile())
             m_columns.push_back({});
     });
 
@@ -53,9 +53,9 @@ void ColumnView::show()
     auto file_manager = Hkx::HkxFileManager::getSingleton();
     if (ImGui::Begin("Column View", &m_show, ImGuiWindowFlags_HorizontalScrollbar))
     {
-        if (file_manager->isFileSelected())
+        if (auto _file = file_manager->getCurrentFile(); _file && _file->getType() == Hkx::HkxFile::kBehaviour)
         {
-            auto&       file               = file_manager->getCurrentFile();
+            auto&       file               = *dynamic_cast<Hkx::BehaviourFile*>(_file);
             std::string root_state_machine = file.getRootStateMachine().data();
 
             if (ImGui::InputText("Navigate to object", &m_nav_edit_str, ImGuiInputTextFlags_EnterReturnsTrue))

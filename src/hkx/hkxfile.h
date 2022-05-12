@@ -23,6 +23,15 @@ enum HkxFileEventEnum
 class HkxFile
 {
 public:
+    enum HkxFileType
+    {
+        kUnknown,
+        kBehaviour,
+        kCharacter,
+        kSkeleton
+    };
+    virtual constexpr HkxFileType getType() { return kUnknown; }
+
     void                    loadFile(std::string_view path);
     void                    saveFile(std::string_view path = {});
     inline bool             isFileLoaded() { return m_loaded; }
@@ -97,6 +106,8 @@ protected:
 class BehaviourFile : public HkxFile
 {
 public:
+    virtual constexpr HkxFileType getType() override { return kBehaviour; }
+
     void loadFile(std::string_view path);
     void saveFile(std::string_view path = {});
 
@@ -136,6 +147,8 @@ private:
 class SkeletonFile : public HkxFile
 {
 public:
+    virtual constexpr HkxFileType getType() override { return kSkeleton; }
+
     void loadFile(std::string_view path);
 
     inline pugi::xml_node   getBoneNode(bool ragdoll = false) { return (ragdoll ? m_skel_rag_obj : m_skel_obj).getByName("bones"); }
@@ -155,6 +168,8 @@ private:
 class CharacterFile : public HkxFile
 {
 public:
+    virtual constexpr HkxFileType getType() override { return kCharacter; }
+
     void loadFile(std::string_view path);
 
     inline virtual bool isObjEssential(std::string_view id) override
@@ -179,13 +194,32 @@ public:
 
     inline void setCurrentFile(int idx)
     {
-        m_current_file = idx;
+        m_current_file = &m_files[idx];
         dispatch(kEventFileChanged);
     }
-    inline size_t         getCurrentFileIdx() { return m_current_file; }
-    inline BehaviourFile& getCurrentFile() { return m_files[m_current_file]; }
+    inline void setCurrentFile(HkxFile::HkxFileType type)
+    {
+        switch (type)
+        {
+            case HkxFile::kBehaviour:
+                if (m_files.empty())
+                    m_current_file = nullptr;
+                else
+                    setCurrentFile(0);
+                break;
+            case HkxFile::kSkeleton:
+                m_current_file = &m_skel_file;
+                break;
+            case HkxFile::kCharacter:
+                m_current_file = &m_char_file;
+                break;
+            default: break;
+        }
+        if (type != HkxFile::kUnknown)
+            dispatch(kEventFileChanged);
+    }
+    inline HkxFile* getCurrentFile() { return m_current_file; }
 
-    inline bool                          isFileSelected() { return m_current_file >= 0; }
     inline std::vector<std::string_view> getPathList()
     {
         std::vector<std::string_view> retval;
@@ -198,16 +232,17 @@ public:
     void        saveFile(std::string_view path = {});
     inline void closeCurrentFile()
     {
-        if (m_current_file >= 0)
+        if (m_current_file->getType() == HkxFile::kBehaviour)
         {
-            m_files.erase(m_files.begin() + m_current_file);
-            m_current_file = m_files.empty() ? -1 : std::clamp(m_current_file, 0, (int)m_files.size() - 1);
+            auto idx = std::ranges::find_if(m_files, [=](auto& item) { return &item == m_current_file; }) - m_files.begin();
+            m_files.erase(m_files.begin() + idx);
+            m_current_file = m_files.empty() ? nullptr : &m_files[std::clamp(idx, (int64_t)0, (int64_t)m_files.size() - 1)];
             dispatch(kEventFileChanged);
         }
     }
     inline void closeAllFiles()
     {
-        m_current_file = -1;
+        m_current_file = nullptr;
         m_files.clear();
         dispatch(kEventFileChanged);
     }
@@ -216,7 +251,7 @@ public:
     CharacterFile m_char_file;
 
 private:
-    int                        m_current_file = -1;
+    HkxFile*                   m_current_file = nullptr;
     std::vector<BehaviourFile> m_files;
 };
 

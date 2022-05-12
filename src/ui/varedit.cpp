@@ -21,35 +21,38 @@ void VarEdit::show()
     if (ImGui::Begin("Variable/Event List", &m_show, ImGuiWindowFlags_NoScrollbar))
     {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
-        if (file_manager->isFileSelected())
+        if (auto file = file_manager->getCurrentFile(); file)
         {
-            if (ImGui::BeginTable("varlisttbl", 2))
+            if (file->getType() == Hkx::HkxFile::kBehaviour)
             {
-                ImGui::TableNextColumn();
-                ImGui::RadioButton("Variables", &m_show_list, kShowVariables);
-                ImGui::RadioButton("Character Properties", &m_show_list, kShowProperties);
-                addTooltip("This edits character properties within the behaviour file itself,\nnot the ones in the actual character.");
-                ImGui::RadioButton("Attributes", &m_show_list, kShowAttributes);
-                ImGui::Separator();
-                switch (m_show_list)
+                if (ImGui::BeginTable("varlisttbl", 2))
                 {
-                    case kShowVariables:
-                        showVarList();
-                        break;
-                    case kShowProperties:
-                        showPropList();
-                        break;
-                    default: ImGui::TextDisabled("Not supported yet.");
+                    ImGui::TableNextColumn();
+                    ImGui::RadioButton("Variables", &m_show_list, kShowVariables);
+                    ImGui::RadioButton("Character Properties", &m_show_list, kShowProperties);
+                    addTooltip("This edits character properties within the behaviour file itself,\nnot the ones in the actual character.");
+                    ImGui::RadioButton("Attributes", &m_show_list, kShowAttributes);
+                    ImGui::Separator();
+                    switch (m_show_list)
+                    {
+                        case kShowVariables:
+                            showVarList();
+                            break;
+                        case kShowProperties:
+                            showPropList();
+                            break;
+                        default: ImGui::TextDisabled("Not supported yet.");
+                    }
+                    ImGui::TableNextColumn();
+                    showEvtList();
+                    ImGui::EndTable();
                 }
-                ImGui::TableNextColumn();
-                showEvtList();
-                ImGui::EndTable();
-            }
+            } // Charcter file here.
+            else
+                ImGui::TextDisabled("Incompatible hkx type.");
         }
         else
-        {
             ImGui::TextDisabled("No loaded file.");
-        }
     }
     ImGui::End();
 }
@@ -63,7 +66,7 @@ void VarEdit::showVarList()
 
     bool  scroll_to_bottom = false;
     auto  file_manager     = Hkx::HkxFileManager::getSingleton();
-    auto& current_file     = file_manager->getCurrentFile();
+    auto& current_file     = *dynamic_cast<Hkx::BehaviourFile*>(file_manager->getCurrentFile());
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Variables"), ImGui::SameLine();
@@ -178,7 +181,7 @@ void VarEdit::showEvtList()
 
     bool  scroll_to_bottom = false;
     auto  file_manager     = Hkx::HkxFileManager::getSingleton();
-    auto& current_file     = file_manager->getCurrentFile();
+    auto& current_file     = *dynamic_cast<Hkx::BehaviourFile*>(file_manager->getCurrentFile());
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Animation Events"), ImGui::SameLine();
@@ -258,7 +261,7 @@ void VarEdit::showPropList()
 
     bool  scroll_to_bottom = false;
     auto  file_manager     = Hkx::HkxFileManager::getSingleton();
-    auto& current_file     = file_manager->getCurrentFile();
+    auto& current_file     = *dynamic_cast<Hkx::BehaviourFile*>(file_manager->getCurrentFile());
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Character Properties"), ImGui::SameLine();

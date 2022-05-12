@@ -11,7 +11,7 @@ namespace Haviour
 {
 namespace Ui
 {
-void MacroModal::open(pugi::xml_node working_obj, Hkx::BehaviourFile* file)
+void MacroModal::open(pugi::xml_node working_obj, Hkx::HkxFile* file)
 {
     m_open        = true;
     m_working_obj = working_obj;
@@ -40,10 +40,13 @@ void MacroModal::show()
 }
 //////////////////// Trigger Parser
 
-void TriggerMacro::open(pugi::xml_node working_obj, Hkx::BehaviourFile* file)
+void TriggerMacro::open(pugi::xml_node working_obj, Hkx::HkxFile* file)
 {
-    MacroModal::open(working_obj, file);
-    m_parse_text = hkTriggerArray2Str(working_obj, *file);
+    if (file->getType() == Hkx::HkxFile::kBehaviour)
+    {
+        MacroModal::open(working_obj, file);
+        m_parse_text = hkTriggerArray2Str(working_obj, *dynamic_cast<Hkx::BehaviourFile*>(file));
+    }
 }
 
 void TriggerMacro::drawUi()
@@ -79,6 +82,7 @@ void TriggerMacro::drawUi()
 
 void TriggerMacro::parse()
 {
+    auto file          = dynamic_cast<Hkx::BehaviourFile*>(m_file);
     auto triggers_node = m_working_obj.getByName("triggers");
     if (m_replace)
     {
@@ -94,13 +98,13 @@ void TriggerMacro::parse()
 
         std::string evt_name;
         line_stream >> evt_name;
-        auto evt = m_file->m_evt_manager.getEntryByName(evt_name);
+        auto evt = file->m_evt_manager.getEntryByName(evt_name);
 
         if (!evt.m_valid)
         {
             if (m_create_new_event)
             {
-                evt                             = m_file->m_evt_manager.addEntry();
+                evt                             = file->m_evt_manager.addEntry();
                 evt.get<Hkx::PropName>().text() = evt_name.c_str();
             }
             else

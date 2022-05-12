@@ -31,7 +31,7 @@ PropEdit::~PropEdit()
 
 void PropEdit::setObject(std::string_view obj_id)
 {
-    if (obj_id == m_edit_obj_id || !Hkx::HkxFileManager::getSingleton()->getCurrentFile().getObj(obj_id))
+    if (obj_id == m_edit_obj_id || !Hkx::HkxFileManager::getSingleton()->getCurrentFile()->getObj(obj_id))
         return;
     m_edit_obj_id = obj_id;
     m_history.push_front(m_edit_obj_id);
@@ -46,7 +46,7 @@ void PropEdit::showHistoryList()
     {
         for (auto history : m_history)
         {
-            auto history_node = Hkx::HkxFileManager::getSingleton()->getCurrentFile().getObj(history);
+            auto history_node = Hkx::HkxFileManager::getSingleton()->getCurrentFile()->getObj(history);
             if (history_node)
             {
                 const bool is_selected = false;
@@ -72,7 +72,7 @@ void PropEdit::showRefList()
         if (!m_edit_obj_id.empty())
         {
             std::vector<std::string> ref_list = {};
-            auto&                    file     = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
+            auto&                    file     = *Hkx::HkxFileManager::getSingleton()->getCurrentFile();
             file.getObjRefs(m_edit_obj_id, ref_list);
             for (auto& ref_id : ref_list)
             {
@@ -110,9 +110,9 @@ void PropEdit::show()
                 setObject(m_edit_obj_id_input);
             addTooltip("Press Enter to apply.");
 
-            if (Hkx::HkxFileManager::getSingleton()->isFileSelected())
+            if (auto _file = Hkx::HkxFileManager::getSingleton()->getCurrentFile(); _file)
             {
-                auto& file     = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
+                auto& file     = *_file;
                 auto  edit_obj = file.getObj(m_edit_obj_id);
                 if (edit_obj)
                 {

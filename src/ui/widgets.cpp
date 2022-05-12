@@ -345,7 +345,8 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::Behaviour
 
 bool ParamEdit::showButton()
 {
-    varBindingButton(getName(), m_hkparam, m_file);
+    varBindingButton(getName(), m_hkparam,
+                     m_file->getType() == Hkx::HkxFile::kBehaviour ? dynamic_cast<Hkx::BehaviourFile*>(m_file) : nullptr);
     return false;
 }
 
@@ -409,94 +410,14 @@ bool BoneEdit::showButton()
     return res.has_value();
 }
 
+void setPropObj(std::string_view value) { PropEdit::getSingleton()->setObject(value); }
+
 ////////////////  EDITS
-
-void refEdit(pugi::xml_node hkparam, const std::vector<std::string_view>& classes, Hkx::BehaviourFile& file, std::string_view hint, std::string_view manual_name)
-{
-    ImGui::TableNextColumn();
-
-    ImGui::PushID(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data());
-
-    bool        edited    = false;
-    std::string old_value = hkparam.text().as_string();
-    auto        value     = old_value;
-
-    if (ImGui::InputText(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), &value))
-    {
-        edited = true;
-        if (auto obj = file.getObj(value); obj)                                                                                        // Is obj
-            if (!classes.empty() && std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) != classes.end()) // Same class
-                hkparam.text() = value.c_str();
-            else
-                hkparam.text() = "null";
-        else
-            hkparam.text() = "null";
-    }
-    if (!hint.empty())
-        addTooltip(hint.data());
-
-    ImGui::TableNextColumn();
-    varBindingButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), hkparam, file);
-
-    if (getParentObj(hkparam).getByName("variableBindingSet"))
-        ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_ARROW_CIRCLE_RIGHT))
-        PropEdit::getSingleton()->setObject(value);
-    addTooltip("Go to");
-
-    ImGui::SameLine();
-    if (ImGui::BeginPopup("Append"))
-    {
-        auto& class_info = Hkx::getClassInfo();
-        for (auto class_name : classes)
-        {
-            if (!Hkx::getClassDefaultMap().contains(class_name))
-                ImGui::BeginDisabled();
-            if (ImGui::Selectable(class_name.data()))
-            {
-                value = file.addObj(class_name);
-                if (!value.empty())
-                {
-                    hkparam.text() = value.c_str();
-                    edited         = true;
-                }
-                ImGui::CloseCurrentPopup();
-                break;
-            }
-            if (!Hkx::getClassDefaultMap().contains(class_name))
-                ImGui::EndDisabled();
-            if (class_info.contains(class_name))
-                addTooltip(class_info.at(class_name).data())
-        }
-
-        ImGui::EndPopup();
-    }
-    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
-        ImGui::OpenPopup("Append");
-    addTooltip("Append");
-    if (auto obj = file.getObj(hkparam.text().as_string()); obj)
-    {
-        ImGui::SameLine();
-        ImGui::TextUnformatted(getObjContextName(obj));
-    }
-
-    if (edited)
-    {
-        auto parent_obj = getParentObj(hkparam);
-        assert(parent_obj);
-        auto parent_id = parent_obj.attribute("name").as_string();
-        if (!isRefBy(old_value, parent_obj))
-            file.deRef(old_value, parent_id);
-        file.addRef(value, parent_id);
-    }
-
-    ImGui::PopID();
-}
 
 bool refEdit(std::string&                         value,
              const std::vector<std::string_view>& classes,
              pugi::xml_node                       parent,
-             Hkx::BehaviourFile&                  file,
+             Hkx::HkxFile&                        file,
              std::string_view                     hint,
              std::string_view                     manual_name)
 {
@@ -579,7 +500,7 @@ bool refEdit(std::string&                         value,
 
 void refList(pugi::xml_node                       hkparam,
              const std::vector<std::string_view>& classes,
-             Hkx::BehaviourFile&                  file,
+             Hkx::HkxFile&                        file,
              std::string_view                     hint_attribute,
              std::string_view                     name_attribute,
              std::string_view                     manual_name)
@@ -638,7 +559,7 @@ void refList(pugi::xml_node                       hkparam,
 pugi::xml_node refLiveEditList(
     pugi::xml_node                       hkparam,
     const std::vector<std::string_view>& classes,
-    Hkx::BehaviourFile&                  file,
+    Hkx::HkxFile&                        file,
     std::string_view                     hint_attribute,
     std::string_view                     name_attribute,
     std::string_view                     manual_name)
@@ -675,7 +596,7 @@ pugi::xml_node refLiveEditList(
         bool   do_delete   = false;
         for (size_t i = 0; i < objs.size(); ++i)
         {
-            auto obj = Hkx::HkxFileManager::getSingleton()->getCurrentFile().getObj(objs[i]);
+            auto obj = Hkx::HkxFileManager::getSingleton()->getCurrentFile()->getObj(objs[i]);
 
             ImGui::PushID(i);
 
@@ -715,7 +636,6 @@ void objLiveEditList(
     pugi::xml_node                             hkparam,
     pugi::xml_node&                            edit_item,
     const char*                                def_str,
-    Hkx::BehaviourFile&                        file,
     std::string_view                           str_id,
     std::function<std::string(pugi::xml_node)> disp_name_func)
 {
@@ -747,21 +667,6 @@ void objLiveEditList(
         }
         ImGui::EndListBox();
     }
-}
-
-void boneEdit(pugi::xml_node      hkparam,
-              Hkx::BehaviourFile& file,
-              Hkx::SkeletonFile&  skel_file,
-              std::string_view    hint,
-              std::string_view    manual_name)
-{
-    ScalarEdit<ImGuiDataType_S16>(hkparam, file, hint, manual_name)();
-    if (getParentObj(hkparam).getByName("variableBindingSet"))
-        ImGui::SameLine();
-
-    auto picked_bone = bonePickerButton(manual_name.empty() ? hkparam.attribute("name").as_string() : manual_name.data(), skel_file, hkparam.text().as_int());
-    if (picked_bone.has_value())
-        hkparam.text() = picked_bone.value();
 }
 
 ////////////////    Linked Prop Edits

@@ -2,6 +2,7 @@
 // All edits must be used in a table context.
 #pragma once
 #include "hkx/hkxfile.h"
+#include "hkx/hkclass.inl"
 
 #include <type_traits>
 
@@ -79,6 +80,12 @@ inline ImVec4 getVarColor(Hkx::Variable& var)
 
 #define addTooltip(...) \
     if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
+
+inline void addTooltipSv(std::string_view text)
+{
+    if (!text.empty() && ImGui::IsItemHovered())
+        ImGui::SetTooltip(text.data());
+}
 
 inline void fullTableSeparator()
 {
@@ -162,22 +169,6 @@ std::optional<T> pickerPopup(const char*                               str_id,
     return std::nullopt;
 }
 
-template <typename Entry>
-bool linkedPropSelectable(Entry& prop)
-{
-    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
-        ImGui::PushStyleColor(ImGuiCol_Text, getVarColor(prop));
-    if (ImGui::Selectable(prop.getItemName().c_str()))
-    {
-        if constexpr (std::is_same_v<Entry, Hkx::Variable>)
-            ImGui::PopStyleColor();
-        return true;
-    }
-    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
-        ImGui::PopStyleColor();
-    return false;
-};
-
 // template <auto fn, typename... Args>
 // typename std::invoke_result_t<decltype(fn), const char*, Args..., bool> pickerButton(const char* str_id, Args... args)
 // {
@@ -205,6 +196,22 @@ bool linkedPropSelectable(Entry& prop)
     auto res = func("select prop", __VA_ARGS__, open); \
     ImGui::PopID();                                    \
     return res;
+
+template <typename Entry>
+bool linkedPropSelectable(Entry& prop)
+{
+    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+        ImGui::PushStyleColor(ImGuiCol_Text, getVarColor(prop));
+    if (ImGui::Selectable(prop.getItemName().c_str()))
+    {
+        if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+            ImGui::PopStyleColor();
+        return true;
+    }
+    if constexpr (std::is_same_v<Entry, Hkx::Variable>)
+        ImGui::PopStyleColor();
+    return false;
+};
 
 template <typename Manager>
 std::optional<typename Manager::Entry> linkedPropPickerPopup(const char* str_id, Manager& prop_manager, bool just_open)
@@ -244,41 +251,6 @@ inline std::optional<std::string_view> animPickerButton(const char* str_id, Hkx:
 
 ///////////////////////// OTHER BUTTONS
 
-template <bool as_int, size_t N>
-void flagEditButton(const char* str_id, pugi::xml_node hkparam, const std::array<EnumWrapper, N>& flags)
-{
-    ImGui::PushID(str_id);
-
-    if (ImGui::Button(ICON_FA_FLAG))
-        ImGui::OpenPopup("edit flags");
-
-    if (ImGui::BeginPopup("edit flags"))
-    {
-        uint32_t value;
-
-        if constexpr (as_int)
-            value = hkparam.text().as_uint();
-        else
-            value = str2FlagVal(hkparam.text().as_string(), flags);
-
-        for (auto& flag : flags)
-            if (flag.val)
-            {
-                if (ImGui::CheckboxFlags(flag.name.data(), &value, flag.val))
-                {
-                    if constexpr (as_int)
-                        hkparam.text() = value;
-                    else
-                        hkparam.text() = flagVal2Str(value, flags).c_str();
-                }
-                if (!flag.hint.empty())
-                    addTooltip(flag.hint.data());
-            }
-        ImGui::EndPopup();
-    }
-
-    ImGui::PopID();
-}
 template <auto& flags>
 bool flagEditButton(const char* str_id, uint32_t& value)
 {
@@ -319,25 +291,25 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::Behaviour
         return *this;                     \
     }
 
-#define DEF_EDIT_CONSTR(derived, base)      \
-    derived() = default;                    \
-    inline derived(                         \
-        pugi::xml_node      hkparam,        \
-        Hkx::BehaviourFile* file = nullptr, \
-        std::string_view    hint = {},      \
-        std::string_view    name = {}) :       \
-        base(hkparam, file, hint, name) {}  \
-    inline derived(                         \
-        pugi::xml_node      hkparam,        \
-        Hkx::BehaviourFile& file,           \
-        std::string_view    hint = {},      \
-        std::string_view    name = {}) :       \
+#define DEF_EDIT_CONSTR(derived, base)     \
+    derived() = default;                   \
+    inline derived(                        \
+        pugi::xml_node   hkparam,          \
+        Hkx::HkxFile*    file = nullptr,   \
+        std::string_view hint = {},        \
+        std::string_view name = {}) :      \
+        base(hkparam, file, hint, name) {} \
+    inline derived(                        \
+        pugi::xml_node   hkparam,          \
+        Hkx::HkxFile&    file,             \
+        std::string_view hint = {},        \
+        std::string_view name = {}) :      \
         derived(hkparam, &file, hint, name) {}
 
 struct ParamEdit
 {
     DEF_FACT_MEM(pugi::xml_node, hkparam, {})
-    DEF_FACT_MEM(Hkx::BehaviourFile*, file, nullptr) // for binding
+    DEF_FACT_MEM(Hkx::HkxFile*, file, nullptr) // for binding
     DEF_FACT_MEM(std::string_view, hint, {})
     DEF_FACT_MEM(std::string_view, name, {})
 
@@ -348,8 +320,7 @@ struct ParamEdit
 
         ImGui::TableNextColumn();
         auto update = showEdit();
-        if (!m_hint.empty())
-            addTooltip(m_hint.data());
+        addTooltipSv(m_hint);
         ImGui::TableNextColumn();
         update |= showButton();
 
@@ -362,9 +333,9 @@ struct ParamEdit
     virtual void updateValue() = 0; // update hkparam with new value
 
     ParamEdit() = default;
-    inline ParamEdit(pugi::xml_node hkparam, Hkx::BehaviourFile* file = nullptr, std::string_view hint = {}, std::string_view name = {}) :
+    inline ParamEdit(pugi::xml_node hkparam, Hkx::HkxFile* file = nullptr, std::string_view hint = {}, std::string_view name = {}) :
         m_hkparam(hkparam), m_file(file), m_hint(hint), m_name(name){};
-    inline ParamEdit(pugi::xml_node hkparam, Hkx::BehaviourFile& file, std::string_view hint = {}, std::string_view name = {}) :
+    inline ParamEdit(pugi::xml_node hkparam, Hkx::HkxFile& file, std::string_view hint = {}, std::string_view name = {}) :
         ParamEdit(hkparam, &file, hint, name){};
 
     virtual inline void operator()() { show(); }
@@ -412,6 +383,7 @@ struct ScalarEdit : public ParamEdit
     virtual bool showEdit() override
     {
         constexpr auto format = (data_type == ImGuiDataType_Float) ? "%.6f" : nullptr;
+        ImGui::SetNextItemWidth(120);
         return ImGui::InputScalar(getName(), data_type, &m_value, nullptr, nullptr, format);
     }
     DEF_EDIT_CONSTR(ScalarEdit, ParamEdit)
@@ -546,25 +518,98 @@ struct FlagEdit : public StringEdit
     DEF_EDIT_CONSTR(FlagEdit, StringEdit)
 };
 
+void setPropObj(std::string_view value); // for removing PropEdit dependency in header
+template <auto& classes>                 // std::array<std::string_view>
+struct RefEdit : public StringEdit
+{
+    virtual bool showEdit() override
+    {
+        ImGui::SetNextItemWidth(60);
+        auto res = StringEdit::showEdit();
+        if (res)
+        {
+            auto obj = m_file->getObj(m_value);
+            if (!obj || std::ranges::find(classes, std::string_view(obj.attribute("class").as_string())) == classes.end())
+                m_value = "null";
+        }
+        return res;
+    }
+    virtual bool showButton() override
+    {
+        ParamEdit::showButton();
+        ImGui::PushID(getName());
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_ARROW_CIRCLE_RIGHT))
+            setPropObj(m_value);
+        addTooltip("Go to");
+        ImGui::SameLine();
+        bool edited = false;
+        if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+            ImGui::OpenPopup("Append");
+        addTooltip("Append");
+        if (ImGui::BeginPopup("Append"))
+        {
+            auto& class_info = Hkx::getClassInfo();
+            for (auto class_name : classes)
+            {
+                if (!Hkx::getClassDefaultMap().contains(class_name))
+                    ImGui::BeginDisabled();
+                if (ImGui::Selectable(class_name.data()))
+                {
+                    auto res = m_file->addObj(class_name);
+                    if (!m_value.empty())
+                    {
+                        m_value = res;
+                        edited  = true;
+                    }
+                    ImGui::CloseCurrentPopup();
+                    break;
+                }
+                if (!Hkx::getClassDefaultMap().contains(class_name))
+                    ImGui::EndDisabled();
+                if (class_info.contains(class_name))
+                    addTooltip(class_info.at(class_name).data())
+            }
+
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+        if (auto obj = m_file->getObj(m_value); obj)
+        {
+            ImGui::SameLine();
+            ImGui::TextUnformatted(getObjContextName(obj));
+        }
+        return edited;
+    }
+    virtual void updateValue() override
+    {
+        auto old_value  = m_hkparam.text().as_string();
+        auto parent_obj = getParentObj(m_hkparam);
+        assert(parent_obj);
+        auto parent_id = parent_obj.attribute("name").as_string();
+        if (!isRefBy(old_value, parent_obj))
+            m_file->deRef(old_value, parent_id);
+        m_file->addRef(m_value, parent_id);
+        StringEdit::updateValue();
+    }
+    DEF_EDIT_CONSTR(RefEdit, StringEdit)
+};
+
 ////////////////    HKPARARM EDITS
 
-void refEdit(pugi::xml_node                       hkparam,
-             const std::vector<std::string_view>& classes, // should've used array but i don't wanna stuff too much templates here
-             Hkx::BehaviourFile&                  file,
-             std::string_view                     hint        = {},
-             std::string_view                     manual_name = {});
+// I kinda don't wanna refactor them so leave it be
 
 // return true if delete is pressed
 bool refEdit(std::string&                         value,
              const std::vector<std::string_view>& classes,
              pugi::xml_node                       parent,
-             Hkx::BehaviourFile&                  file,
+             Hkx::HkxFile&                        file,
              std::string_view                     hint,
              std::string_view                     manual_name);
 
 void refList(pugi::xml_node                       hkparam,
              const std::vector<std::string_view>& classes,
-             Hkx::BehaviourFile&                  file,
+             Hkx::HkxFile&                        file,
              std::string_view                     hint_attribute = {},
              std::string_view                     name_attribute = {},
              std::string_view                     manual_name    = {});
@@ -572,7 +617,7 @@ void refList(pugi::xml_node                       hkparam,
 pugi::xml_node refLiveEditList(
     pugi::xml_node                       hkparam,
     const std::vector<std::string_view>& classes,
-    Hkx::BehaviourFile&                  file,
+    Hkx::HkxFile&                        file,
     std::string_view                     hint_attribute = {},
     std::string_view                     name_attribute = {},
     std::string_view                     manual_name    = {});
@@ -581,15 +626,8 @@ void objLiveEditList(
     pugi::xml_node                             hkparam,
     pugi::xml_node&                            edit_item,
     const char*                                def_str,
-    Hkx::BehaviourFile&                        file,
     std::string_view                           str_id,
     std::function<std::string(pugi::xml_node)> disp_name_func);
-
-void boneEdit(pugi::xml_node      hkparam,
-              Hkx::BehaviourFile& file,
-              Hkx::SkeletonFile&  skel_file,
-              std::string_view    hint        = {},
-              std::string_view    manual_name = {});
 
 ////////////////    Linked Prop Edits
 

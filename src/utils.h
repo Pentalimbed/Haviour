@@ -83,6 +83,19 @@ struct IsContained<T>
     };
 };
 
+// constexpr array join
+// source: https://gist.github.com/klemens-morgenstern/b75599292667a4f53007
+template <typename T, std::size_t LL, std::size_t RL>
+constexpr std::array<T, LL + RL> joinArray(std::array<T, LL> rhs, std::array<T, RL> lhs)
+{
+    std::array<T, LL + RL> ar;
+
+    auto current = std::copy(rhs.begin(), rhs.end(), ar.begin());
+    std::copy(lhs.begin(), lhs.end(), current);
+
+    return ar;
+}
+
 // using string map without allocation
 // source: https://www.cppstories.com/2021/heterogeneous-access-cpp20/
 struct StringHash

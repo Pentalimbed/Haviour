@@ -21,20 +21,20 @@ public:
     virtual constexpr const char* getName()  = 0;
     virtual constexpr const char* getClass() = 0;
     virtual constexpr const char* getHint()  = 0;
-    virtual void                  open(pugi::xml_node working_obj, Hkx::BehaviourFile* file);
+    virtual void                  open(pugi::xml_node working_obj, Hkx::HkxFile* file);
     virtual void                  show();
     virtual void                  drawUi() = 0;
 
 protected:
-    bool                m_open = false;
-    pugi::xml_node      m_working_obj;
-    Hkx::BehaviourFile* m_file; // potential leak here, but it's modal so ok?
+    bool           m_open = false;
+    pugi::xml_node m_working_obj;
+    Hkx::HkxFile*  m_file; // potential leak here, but it's modal so ok?
 };
 
 class TriggerMacro : public MacroModal
 {
 public:
-    virtual void                  open(pugi::xml_node working_obj, Hkx::BehaviourFile* file) override;
+    virtual void                  open(pugi::xml_node working_obj, Hkx::HkxFile* file) override;
     virtual constexpr const char* getName() override { return "Parse Trigger"; }
     virtual constexpr const char* getClass() override { return "hkbClipTriggerArray"; }
     virtual constexpr const char* getHint() override

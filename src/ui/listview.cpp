@@ -36,9 +36,9 @@ void ListView::show()
     if (ImGui::Begin("List View", &m_show))
     {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
-        if (file_manager->isFileSelected())
+        if (auto file = file_manager->getCurrentFile(); file)
         {
-            auto& hkxfile = file_manager->getCurrentFile();
+            auto& hkxfile = *file;
             if (ImGui::InputText("Filter", &m_filter))
                 updateCache();
             ImGui::SameLine();
@@ -107,9 +107,9 @@ void ListView::show()
 
 void ListView::updateCache(bool sort_only)
 {
-    if (!Hkx::HkxFileManager::getSingleton()->isFileSelected())
+    if (!Hkx::HkxFileManager::getSingleton()->getCurrentFile())
         return;
-    auto& hkxfile = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
+    auto& hkxfile = *Hkx::HkxFileManager::getSingleton()->getCurrentFile();
     if (!sort_only)
     {
         m_cache_list.clear();
@@ -174,7 +174,7 @@ void ListView::updateCache(bool sort_only)
 
 void ListView::drawTable()
 {
-    auto& hkxfile = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
+    auto& hkxfile = *Hkx::HkxFileManager::getSingleton()->getCurrentFile();
 
     constexpr auto table_flag =
         ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |

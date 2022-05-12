@@ -669,7 +669,7 @@ void HkxFileManager::loadFile(std::string_view path)
     file.loadFile(path);
     if (file.isFileLoaded())
     {
-        m_current_file = m_files.size() - 1;
+        m_current_file = &m_files[m_files.size() - 1];
         dispatch(kEventFileChanged);
     }
     else
@@ -678,10 +678,10 @@ void HkxFileManager::loadFile(std::string_view path)
 
 void HkxFileManager::saveFile(std::string_view path)
 {
-    if (m_current_file < 0)
+    if (!m_current_file)
         return;
 
-    m_files[m_current_file].saveFile(path);
+    m_current_file->saveFile(path);
 }
 } // namespace Hkx
 } // namespace Haviour

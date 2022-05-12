@@ -172,8 +172,8 @@ int initApp()
 
     Hkx::HkxFileManager::getSingleton()->appendListener(Hkx::kEventFileChanged, [=]() {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
-        if (file_manager->isFileSelected())
-            glfwSetWindowTitle(g_window, fmt::format("{} [{}]", g_window_title, file_manager->getCurrentFile().getPath()).c_str());
+        if (auto file = file_manager->getCurrentFile(); file)
+            glfwSetWindowTitle(g_window, fmt::format("{} [{}]", g_window_title, file->getPath()).c_str());
         else
             glfwSetWindowTitle(g_window, g_window_title);
     });

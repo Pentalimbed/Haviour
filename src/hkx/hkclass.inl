@@ -1621,6 +1621,24 @@ constexpr auto g_class_modifiers = std::to_array<std::string_view>(
      "BSTweenerModifier",
      "BSSpeedSamplerModifier"});
 
+constexpr auto g_class_payload          = std::to_array<std::string_view>({"hkbStringEventPayload"});
+constexpr auto g_class_transition       = std::to_array<std::string_view>({"hkbBlendingTransitionEffect"});
+constexpr auto g_class_expression       = std::to_array<std::string_view>({"hkbExpressionCondition"});
+constexpr auto g_class_expr_array       = std::to_array<std::string_view>({"hkbExpressionDataArray"});
+constexpr auto g_class_binding          = std::to_array<std::string_view>({"hkbVariableBindingSet"});
+constexpr auto g_class_graph_data       = std::to_array<std::string_view>({"hkbBehaviorGraphData"});
+constexpr auto g_class_state_chooser    = std::to_array<std::string_view>({"hkbStateChooser"});
+constexpr auto g_class_transition_array = std::to_array<std::string_view>({"hkbBlendingTrahkbStateMachineTransitionInfoArraynsitionEffect"});
+constexpr auto g_class_events_array     = std::to_array<std::string_view>({"hkbStateMachineEventPropertyArray"});
+constexpr auto g_class_bone_weights     = std::to_array<std::string_view>({"hkbBoneWeightArray"});
+constexpr auto g_class_bone_indices     = std::to_array<std::string_view>({"hkbBoneIndexArray"});
+constexpr auto g_class_boneswitch_data  = std::to_array<std::string_view>({"BSBoneSwitchGeneratorBoneData"});
+constexpr auto g_class_triggers         = std::to_array<std::string_view>({"hkbClipTriggerArray"});
+constexpr auto g_class_clip             = std::to_array<std::string_view>({"hkbClipGenerator"});
+constexpr auto g_class_blender_gens     = std::to_array<std::string_view>({"hkbBlenderGenerator", "hkbPoseMatchingGenerator"});
+constexpr auto g_class_event_ranges     = std::to_array<std::string_view>({"hkbEventRangeDataArray"});
+constexpr auto g_class_key_bones        = std::to_array<std::string_view>({"keyframedBonesList"});
+
 //////////////////////////    CLASS INFO
 
 inline const std::map<std::string_view, std::string_view>& getClassInfo()

@@ -9,7 +9,7 @@
 
 namespace Haviour
 {
-inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::BehaviourFile& file)
+inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::HkxFile& file)
 {
     auto state_machine = getParentObj(hkparam);
     while (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
@@ -25,7 +25,7 @@ inline pugi::xml_node getParentStateMachine(pugi::xml_node hkparam, Hkx::Behavio
     return {};
 }
 
-inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_id, Hkx::BehaviourFile& file)
+inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_id, Hkx::HkxFile& file)
 {
     if (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
         return {};
@@ -48,7 +48,7 @@ inline pugi::xml_node getStateById(pugi::xml_node state_machine, int32_t state_i
     return {};
 }
 
-inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::BehaviourFile& file)
+inline int getBiggestStateId(pugi::xml_node state_machine, Hkx::HkxFile& file)
 {
     if (strcmp(state_machine.attribute("class").as_string(), "hkbStateMachine"))
         return -1;

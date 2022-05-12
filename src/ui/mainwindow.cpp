@@ -179,7 +179,7 @@ void saveFileAs()
 {
     auto        file_manager = Hkx::HkxFileManager::getSingleton();
     nfdchar_t*  outPath      = nullptr;
-    nfdresult_t result       = NFD_SaveDialog("hkx", file_manager->getCurrentFile().getPath().data(), &outPath);
+    nfdresult_t result       = NFD_SaveDialog("hkx", file_manager->getCurrentFile()->getPath().data(), &outPath);
     if (result == NFD_OKAY)
     {
         file_manager->saveFile(outPath);
@@ -203,14 +203,13 @@ void showMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            bool dummy_selected = false;
             if (ImGui::MenuItem("New", "CTRL+N"))
                 newFile();
             if (ImGui::MenuItem("Open", "CTRL+O"))
                 openFile();
-            if (ImGui::MenuItem("Save", "CTRL+S", &dummy_selected, file_manager->isFileSelected()))
+            if (ImGui::MenuItem("Save", "CTRL+S", false, file_manager->getCurrentFile() != nullptr))
                 file_manager->saveFile();
-            if (ImGui::MenuItem("Save As", nullptr, &dummy_selected, file_manager->isFileSelected()))
+            if (ImGui::MenuItem("Save As", nullptr, false, file_manager->getCurrentFile() != nullptr))
                 saveFileAs();
 
             ImGui::Separator();
@@ -220,7 +219,8 @@ void showMenuBar()
                 ImGui::TextDisabled("No file loaded");
             else
                 for (int i = 0; i < path_list.size(); ++i)
-                    if (ImGui::MenuItem(path_list[i].data(), nullptr, i == file_manager->getCurrentFileIdx()))
+                    if (ImGui::MenuItem(path_list[i].data(), nullptr,
+                                        (file_manager->getCurrentFile() != nullptr) && (path_list[i] == file_manager->getCurrentFile()->getPath())))
                         file_manager->setCurrentFile(i);
 
             ImGui::Separator();
@@ -265,17 +265,23 @@ void showMenuBar()
 
             ImGui::Separator();
 
-            ImGui::TextDisabled("Character: %s", file_manager->m_char_file.isFileLoaded() ? file_manager->m_char_file.getPath().data() : "None");
-            ImGui::TextDisabled("Skelton: %s", file_manager->m_skel_file.isFileLoaded() ? file_manager->m_skel_file.getPath().data() : "None");
+            if (ImGui::MenuItem(fmt::format("Character: {}", file_manager->m_char_file.isFileLoaded() ? file_manager->m_char_file.getPath().data() : "None").c_str(), nullptr,
+                                file_manager->getCurrentFile() == &file_manager->m_char_file,
+                                file_manager->m_char_file.isFileLoaded()))
+                file_manager->setCurrentFile(Hkx::HkxFile::kCharacter);
+            if (ImGui::MenuItem(fmt::format("Skeleton: {}", file_manager->m_skel_file.isFileLoaded() ? file_manager->m_skel_file.getPath().data() : "None").c_str(), nullptr,
+                                file_manager->getCurrentFile() == &file_manager->m_skel_file,
+                                file_manager->m_skel_file.isFileLoaded()))
+                file_manager->setCurrentFile(Hkx::HkxFile::kSkeleton);
 
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit"))
         {
-            if (ImGui::MenuItem("Build Reference List", nullptr, false, file_manager->isFileSelected()))
-                file_manager->getCurrentFile().buildRefList();
-            if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->isFileSelected()))
-                file_manager->getCurrentFile().reindexObj();
+            if (ImGui::MenuItem("Build Reference List", nullptr, false, file_manager->getCurrentFile() != nullptr))
+                file_manager->getCurrentFile()->buildRefList();
+            if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->getCurrentFile() != nullptr))
+                file_manager->getCurrentFile()->reindexObj();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))

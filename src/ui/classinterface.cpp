@@ -15,7 +15,12 @@ namespace Ui
 
 constexpr auto EditAreaTableFlag = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
 
-#define UICLASS(hkclass) void show_##hkclass(pugi::xml_node obj, Hkx::BehaviourFile& file)
+#define UICLASS(hkclass) void show_##hkclass(pugi::xml_node obj, Hkx::HkxFile& file)
+
+inline void sayIncompatible()
+{
+    ImGui::TextDisabled("This class is shouldn't be in this file.");
+}
 
 ///////////////////////    NOT REGISTERED BUT COMMONLY USED
 
@@ -31,14 +36,20 @@ UICLASS(hkbExpressionCondition)
 
 UICLASS(hkbEvent)
 {
-    EvtPickerEdit(obj.getByName("id"), file).manager (&file.m_evt_manager)();
-    refEdit(obj.getByName("payload"), {"hkbStringEventPayload"}, file);
-    if (auto payload = file.getObj(obj.getByName("payload").text().as_string()); payload)
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ImGui::Indent(10);
-        show_hkbStringEventPayload(payload, file);
-        ImGui::Indent(-10);
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        EvtPickerEdit(obj.getByName("id"), file).manager (&_file.m_evt_manager)();
+        RefEdit<Hkx::g_class_payload>(obj.getByName("payload"), file)();
+        if (auto payload = file.getObj(obj.getByName("payload").text().as_string()); payload)
+        {
+            ImGui::Indent(10);
+            show_hkbStringEventPayload(payload, file);
+            ImGui::Indent(-10);
+        }
     }
+    else
+        sayIncompatible();
 }
 void hkbEventSelectable(pugi::xml_node obj, Hkx::BehaviourFile& file, const char* hint, const char* text)
 {
@@ -68,139 +79,157 @@ void hkbEventSelectable(pugi::xml_node obj, Hkx::BehaviourFile& file, const char
 
 UICLASS(hkbStateMachineEventPropertyArray)
 {
-    auto events_node = obj.getByName("events");
-
-    ImGui::AlignTextToFramePadding();
-    ImGui::BulletText("events"), ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
-        appendXmlString(events_node, Hkx::g_def_hkbEvent);
-    addTooltip("Add new event");
-    ImGui::SameLine();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(events_node.attribute("numelements").as_string());
-
-    constexpr auto table_flag = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable |
-        ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
-        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
-    if (ImGui::BeginTable("events", 2, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        pugi::xml_node mark_delete = {};
-        bool           do_delete   = false;
-        auto           numelements = events_node.attribute("numelements").as_ullong();
-        size_t         i           = 0;
-        for (auto event : events_node.children())
+        Hkx::BehaviourFile& _file       = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        auto                events_node = obj.getByName("events");
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::BulletText("events"), ImGui::SameLine();
+        if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+            appendXmlString(events_node, Hkx::g_def_hkbEvent);
+        addTooltip("Add new event");
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(events_node.attribute("numelements").as_string());
+
+        constexpr auto table_flag = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_Resizable |
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
+        if (ImGui::BeginTable("events", 2, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
         {
-            ImGui::PushID(i);
-            hkbEventSelectable(event, file, {},
-                               file.m_evt_manager.getEntry(event.getByName("id").text().as_ullong()).getName());
-            if (ImGui::Button(ICON_FA_MINUS_CIRCLE))
+            pugi::xml_node mark_delete = {};
+            bool           do_delete   = false;
+            auto           numelements = events_node.attribute("numelements").as_ullong();
+            size_t         i           = 0;
+            for (auto event : events_node.children())
             {
-                do_delete   = true;
-                mark_delete = event;
+                ImGui::PushID(i);
+                hkbEventSelectable(event, _file, {},
+                                   _file.m_evt_manager.getEntry(event.getByName("id").text().as_ullong()).getName());
+                if (ImGui::Button(ICON_FA_MINUS_CIRCLE))
+                {
+                    do_delete   = true;
+                    mark_delete = event;
+                }
+                addTooltip("Remove");
+                ImGui::PopID();
+
+                ++i;
             }
-            addTooltip("Remove");
-            ImGui::PopID();
+            if (do_delete)
+            {
+                events_node.remove_child(mark_delete);
+                events_node.attribute("numelements") = events_node.attribute("numelements").as_int() - 1;
+            }
 
-            ++i;
+            ImGui::EndTable();
         }
-        if (do_delete)
-        {
-            events_node.remove_child(mark_delete);
-            events_node.attribute("numelements") = events_node.attribute("numelements").as_int() - 1;
-        }
-
-        ImGui::EndTable();
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbStateMachine_TimeInterval)
 {
-    EvtPickerEdit(obj.getByName("enterEventId"), file,
-                  "The event ID that bounds the beginning of the interval (set to EVENT_ID_NULL to use m_enterTime instead).")
-        .manager (&file.m_evt_manager)();
-    EvtPickerEdit(obj.getByName("exitEventId"), file,
-                  "The event ID that bounds the end of the interval (set to EVENT_ID_NULL to use m_exitTime instead).")
-        .manager (&file.m_evt_manager)();
-    ScalarEdit(obj.getByName("enterTime"), file,
-               "The time at which the interval is entered (used if both m_enterEventId and m_exitEventId are set to EVENT_ID_NULL).")();
-    ScalarEdit(obj.getByName("exitTime"), file,
-               "The time at which the interval is exited (used if both m_enterEventId and m_exitEventId are set to EVENT_ID_NULL).\n"
-               "Setting this to 0.0f means infinity; the inverval will not end.")();
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
+    {
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        EvtPickerEdit(obj.getByName("enterEventId"), file,
+                      "The event ID that bounds the beginning of the interval (set to EVENT_ID_NULL to use m_enterTime instead).")
+            .manager (&_file.m_evt_manager)();
+        EvtPickerEdit(obj.getByName("exitEventId"), file,
+                      "The event ID that bounds the end of the interval (set to EVENT_ID_NULL to use m_exitTime instead).")
+            .manager (&_file.m_evt_manager)();
+        ScalarEdit(obj.getByName("enterTime"), file,
+                   "The time at which the interval is entered (used if both m_enterEventId and m_exitEventId are set to EVENT_ID_NULL).")();
+        ScalarEdit(obj.getByName("exitTime"), file,
+                   "The time at which the interval is exited (used if both m_enterEventId and m_exitEventId are set to EVENT_ID_NULL).\n"
+                   "Setting this to 0.0f means infinity; the inverval will not end.")();
+    }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbStateMachine_TransitionInfo)
 {
-    ImGui::TableNextColumn();
-    ImGui::BulletText("triggerInterval");
-    addTooltip("The interval in which the event must be received for the transition to occur.\n\n"
-               "This is only used if (m_flags & FLAG_USE_TRIGGER_INTERVAL) is true.\n"
-               "You should make sure that the interval is longer than your timestep (eg, 1/30 sec), or else the interval may be missed.");
-    ImGui::Indent(10);
-    if (ImGui::BeginTable("triggerInterval", 2, EditAreaTableFlag, {-FLT_MIN, 27 * 4}))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        show_hkbStateMachine_TimeInterval(obj.getByName("triggerInterval").first_child(), file);
-        ImGui::EndTable();
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        ImGui::TableNextColumn();
+        ImGui::BulletText("triggerInterval");
+        addTooltip("The interval in which the event must be received for the transition to occur.\n\n"
+                   "This is only used if (m_flags & FLAG_USE_TRIGGER_INTERVAL) is true.\n"
+                   "You should make sure that the interval is longer than your timestep (eg, 1/30 sec), or else the interval may be missed.");
+        ImGui::Indent(10);
+        if (ImGui::BeginTable("triggerInterval", 2, EditAreaTableFlag, {-FLT_MIN, 27 * 4}))
+        {
+            show_hkbStateMachine_TimeInterval(obj.getByName("triggerInterval").first_child(), file);
+            ImGui::EndTable();
+        }
+        ImGui::Indent(-10);
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        ImGui::BulletText("initiateInterval");
+        addTooltip("The interval in which the transition may begin.\n\n"
+                   "This is only used if (m_flags & FLAG_USE_BEGIN_INTERVAL) is true.\n"
+                   "If the transition is activated outside of this interval, the transition will be delayed until the interval begins.\n"
+                   "You should make sure that the interval is longer than your timestep (eg, 1/30 sec), or else the interval may be missed.");
+        ImGui::Indent(10);
+        if (ImGui::BeginTable("initiateInterval", 2, EditAreaTableFlag, {-FLT_MIN, 27 * 4}))
+        {
+            show_hkbStateMachine_TimeInterval(obj.getByName("initiateInterval").first_child(), file);
+            ImGui::EndTable();
+        }
+        ImGui::Indent(-10);
+        ImGui::TableNextRow();
+
+        RefEdit<Hkx::g_class_transition>(obj.getByName("transition"), file,
+                                         "The transition to apply.\n\n"
+                                         "This is public but should be handled with care since it is reference counted.\n"
+                                         "It's best to change this only by calling methods of hkbStateMachine.")();
+        RefEdit<Hkx::g_class_expression>(obj.getByName("condition"), file,
+                                         "A condition that determines whether the transition should occur.\n\n"
+                                         "The transition only occurs if this condition evaluates to true.\n"
+                                         "If m_event == hkbEvent::EVENT_ID_NULL then the transition occurs as soon as the condition becomes true.\n"
+                                         "Otherwise, the transition occurs when the event is received and the condition is also true.")();
+        auto condition = file.getObj(obj.getByName("condition").text().as_string());
+        if (condition)
+        {
+            ImGui::Indent(10.0F);
+            show_hkbExpressionCondition(condition, file);
+            ImGui::Indent(-10.0F);
+        }
+
+        EvtPickerEdit(obj.getByName("eventId"), file).manager (&_file.m_evt_manager)();
+
+        fullTableSeparator();
+
+        auto state_machine = getParentStateMachine(obj, file);
+        StateEdit(obj.getByName("toStateId"), file,
+                  "The state to which the transition goes.")
+            .state_machine(state_machine)();
+        ScalarEdit<ImGuiDataType_S32>(obj.getByName("fromNestedStateId"), file,
+                                      "The nested state (a state within the state machine that is inside the from-state) from which this transition must be done.")();
+        ScalarEdit<ImGuiDataType_S32>(obj.getByName("toNestedStateId"), file,
+                                      "A nested state to which this transitions goes.")();
+        fullTableSeparator();
+
+        ScalarEdit<ImGuiDataType_S16>(obj.getByName("priority"), file,
+                                      "Each transition has a priority.")();
+        FlagEdit<Hkx::f_hkbStateMachine_TransitionInfo_TransitionFlags>(obj.getByName("flags"), file,
+                                                                        "Flags indicating specialized behavior (see TransitionInfoTransitionFlagBits).")();
     }
-    ImGui::Indent(-10);
-    ImGui::TableNextRow();
-
-    ImGui::TableNextColumn();
-    ImGui::BulletText("initiateInterval");
-    addTooltip("The interval in which the transition may begin.\n\n"
-               "This is only used if (m_flags & FLAG_USE_BEGIN_INTERVAL) is true.\n"
-               "If the transition is activated outside of this interval, the transition will be delayed until the interval begins.\n"
-               "You should make sure that the interval is longer than your timestep (eg, 1/30 sec), or else the interval may be missed.");
-    ImGui::Indent(10);
-    if (ImGui::BeginTable("initiateInterval", 2, EditAreaTableFlag, {-FLT_MIN, 27 * 4}))
-    {
-        show_hkbStateMachine_TimeInterval(obj.getByName("initiateInterval").first_child(), file);
-        ImGui::EndTable();
-    }
-    ImGui::Indent(-10);
-    ImGui::TableNextRow();
-
-    refEdit(obj.getByName("transition"), {"hkbBlendingTransitionEffect"}, file,
-            "The transition to apply.\n\n"
-            "This is public but should be handled with care since it is reference counted.\n"
-            "It's best to change this only by calling methods of hkbStateMachine.");
-    refEdit(obj.getByName("condition"), {"hkbExpressionCondition"}, file,
-            "A condition that determines whether the transition should occur.\n\n"
-            "The transition only occurs if this condition evaluates to true.\n"
-            "If m_event == hkbEvent::EVENT_ID_NULL then the transition occurs as soon as the condition becomes true.\n"
-            "Otherwise, the transition occurs when the event is received and the condition is also true.");
-    auto condition = file.getObj(obj.getByName("condition").text().as_string());
-    if (condition)
-    {
-        ImGui::Indent(10.0F);
-        show_hkbExpressionCondition(condition, file);
-        ImGui::Indent(-10.0F);
-    }
-
-    EvtPickerEdit(obj.getByName("eventId"), file).manager (&file.m_evt_manager)();
-
-    fullTableSeparator();
-
-    auto state_machine = getParentStateMachine(obj, file);
-    StateEdit(obj.getByName("toStateId"), file,
-              "The state to which the transition goes.")
-        .state_machine(state_machine)();
-    ScalarEdit<ImGuiDataType_S32>(obj.getByName("fromNestedStateId"), file,
-                                  "The nested state (a state within the state machine that is inside the from-state) from which this transition must be done.")();
-    ScalarEdit<ImGuiDataType_S32>(obj.getByName("toNestedStateId"), file,
-                                  "A nested state to which this transitions goes.")();
-    fullTableSeparator();
-
-    ScalarEdit<ImGuiDataType_S16>(obj.getByName("priority"), file,
-                                  "Each transition has a priority.")();
-    FlagEdit<Hkx::f_hkbStateMachine_TransitionInfo_TransitionFlags>(obj.getByName("flags"), file,
-                                                                    "Flags indicating specialized behavior (see TransitionInfoTransitionFlagBits).")();
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbModifier)
 {
     StringEdit(obj.getByName("name"), file)();
     ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-    refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+    RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
     BoolEdit(obj.getByName("enable"), file)();
 }
 
@@ -285,218 +314,234 @@ UICLASS(hkbBehaviorGraph)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
         EnumEdit<Hkx::e_variableMode>(obj.getByName("variableMode"), file,
                                       "How do deal with variables when the behavior is inactive.")();
-        refEdit(obj.getByName("rootGenerator"), {"hkbStateMachine"}, file,
-                "The root node of the behavior graph.");
-        refEdit(obj.getByName("data"), {"hkbBehaviorGraphData"}, file,
-                "The constant data associated with the behavior.");
+        RefEdit<Hkx::g_class_generators>(obj.getByName("rootGenerator"), file,
+                                         "The root node of the behavior graph.")();
+        RefEdit<Hkx::g_class_graph_data>(obj.getByName("data"), file,
+                                         "The constant data associated with the behavior.")();
         ImGui::EndTable();
     }
 }
 
 UICLASS(hkbVariableBindingSet)
 {
-    static pugi::xml_node obj_cache;
-    static pugi::xml_node edit_binding = {};
-    if (obj_cache != obj)
-        edit_binding = {};
-    obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
-
-    if (ImGui::BeginTable("hkbBehaviorGraph1", 2, ImGuiTableFlags_SizingStretchProp))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ScalarEdit<ImGuiDataType_S32>(obj.getByName("indexOfBindingToEnable"), file,
-                                      "If there is a binding to the member hkbModifier::m_enable then we store its index here.")();
-        ImGui::EndTable();
-    }
-    ImGui::Separator();
-    if (ImGui::BeginTable("hkbBehaviorGraph2", 2, ImGuiTableFlags_Resizable))
-    {
-        ImGui::TableSetupColumn("bindings", ImGuiTableColumnFlags_WidthFixed, 200.0F);
-        ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableNextRow();
+        Hkx::BehaviourFile&   _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        static pugi::xml_node obj_cache;
+        static pugi::xml_node edit_binding = {};
+        if (obj_cache != obj)
+            edit_binding = {};
+        obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
 
-        ImGui::TableNextColumn();
-        objLiveEditList(obj.getByName("bindings"), edit_binding, Hkx::g_def_hkbVariableBindingSet_Binding, file, "bindings",
-                        [](auto node) { return node.getByName("memberPath").text().as_string(); });
-
-        ImGui::TableNextColumn();
-        if (edit_binding)
+        if (ImGui::BeginTable("hkbBehaviorGraph1", 2, ImGuiTableFlags_SizingStretchProp))
         {
-            if (ImGui::BeginTable("binding", 2, EditAreaTableFlag))
-            {
-                StringEdit(edit_binding.getByName("memberPath"), file,
-                           "The memberPath is made up of member names, separated by '/'. Integers after colons in the path are array indices.\n"
-                           "For example, \"children:2/blendWeight\" would seek an array member named \"children\", access the second member,\n"
-                           "and then look for a member named \"blendWeight\" in that object.")();
-                if (!strcmp(edit_binding.getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) // binding variables
-                    VarPickerEdit(edit_binding.getByName("variableIndex"), file,
-                                  "The index of the variable that is bound to an object member.")
-                        .manager (&file.m_var_manager)();
-                else
-                    PropPickerEdit(edit_binding.getByName("variableIndex"), file,
-                                   "The index of the variable that is bound to an object member.")
-                        .manager (&file.m_prop_manager)();
-                ScalarEdit<ImGuiDataType_S8>(edit_binding.getByName("bitIndex"), file,
-                                             "The index of the bit to which the variable is bound.\n"
-                                             "A value of -1 indicates that we are not binding to an individual bit.")();
-                EnumEdit<Hkx::e_bindingType>(edit_binding.getByName("bindingType"), file,
-                                             "Which data we are binding to.")();
-                ImGui::EndTable();
-            }
+            ScalarEdit<ImGuiDataType_S32>(obj.getByName("indexOfBindingToEnable"), file,
+                                          "If there is a binding to the member hkbModifier::m_enable then we store its index here.")();
+            ImGui::EndTable();
         }
-        else
-            ImGui::TextDisabled("No binding selected.");
+        ImGui::Separator();
+        if (ImGui::BeginTable("hkbBehaviorGraph2", 2, ImGuiTableFlags_Resizable))
+        {
+            ImGui::TableSetupColumn("bindings", ImGuiTableColumnFlags_WidthFixed, 200.0F);
+            ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableNextRow();
 
-        ImGui::EndTable();
+            ImGui::TableNextColumn();
+            objLiveEditList(obj.getByName("bindings"), edit_binding, Hkx::g_def_hkbVariableBindingSet_Binding, "bindings",
+                            [](auto node) { return node.getByName("memberPath").text().as_string(); });
+
+            ImGui::TableNextColumn();
+            if (edit_binding)
+            {
+                if (ImGui::BeginTable("binding", 2, EditAreaTableFlag))
+                {
+                    StringEdit(edit_binding.getByName("memberPath"), file,
+                               "The memberPath is made up of member names, separated by '/'. Integers after colons in the path are array indices.\n"
+                               "For example, \"children:2/blendWeight\" would seek an array member named \"children\", access the second member,\n"
+                               "and then look for a member named \"blendWeight\" in that object.")();
+                    if (!strcmp(edit_binding.getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE")) // binding variables
+                        VarPickerEdit(edit_binding.getByName("variableIndex"), file,
+                                      "The index of the variable that is bound to an object member.")
+                            .manager (&_file.m_var_manager)();
+                    else
+                        PropPickerEdit(edit_binding.getByName("variableIndex"), file,
+                                       "The index of the variable that is bound to an object member.")
+                            .manager (&_file.m_prop_manager)();
+                    ScalarEdit<ImGuiDataType_S8>(edit_binding.getByName("bitIndex"), file,
+                                                 "The index of the bit to which the variable is bound.\n"
+                                                 "A value of -1 indicates that we are not binding to an individual bit.")();
+                    EnumEdit<Hkx::e_bindingType>(edit_binding.getByName("bindingType"), file,
+                                                 "Which data we are binding to.")();
+                    ImGui::EndTable();
+                }
+            }
+            else
+                ImGui::TextDisabled("No binding selected.");
+
+            ImGui::EndTable();
+        }
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbStateMachine)
 {
-    if (ImGui::BeginTable("hkbStateMachine1", 2, ImGuiTableFlags_Resizable))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("states", ImGuiTableColumnFlags_WidthFixed, 300.0F);
-        ImGui::TableNextRow();
-
-        ImGui::TableNextColumn();
-        if (ImGui::BeginTable("hkbStateMachine2", 2, EditAreaTableFlag))
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        if (ImGui::BeginTable("hkbStateMachine1", 2, ImGuiTableFlags_Resizable))
         {
-            StringEdit(obj.getByName("name"), file)();
-            ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-            refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-
-            fullTableSeparator();
+            ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("states", ImGuiTableColumnFlags_WidthFixed, 300.0F);
+            ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
-            ImGui::BulletText("eventToSendWhenStateOrTransitionChanges");
-            addTooltip("If non-null, this event is sent at the beginning and end of a transition, or once for an instantaneous transition.");
+            if (ImGui::BeginTable("hkbStateMachine2", 2, EditAreaTableFlag))
+            {
+                StringEdit(obj.getByName("name"), file)();
+                ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
+                RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+
+                fullTableSeparator();
+
+                ImGui::TableNextColumn();
+                ImGui::BulletText("eventToSendWhenStateOrTransitionChanges");
+                addTooltip("If non-null, this event is sent at the beginning and end of a transition, or once for an instantaneous transition.");
+                ImGui::TableNextColumn();
+                ImGui::Indent(10);
+                show_hkbEvent(obj.getByName("eventToSendWhenStateOrTransitionChanges").first_child(), file);
+                ImGui::Indent(-10);
+
+                fullTableSeparator();
+
+                RefEdit<Hkx::g_class_state_chooser>(obj.getByName("startStateChooser"), file,
+                                                    "an object that chooses the start state")(); // this one in hk2015 replaced by startStateIdSelector
+                StateEdit(obj.getByName("startStateId"), file).state_machine(obj)();
+                VarPickerEdit(obj.getByName("syncVariableIndex"), file,
+                              "We use variables to sync the start state of the state machine.\n\n"
+                              "The value of this index currently must be initialized to the state id which the user wants the start state to be.\n"
+                              "The state machine syncs it start state by setting the value of the start state to that of the variable during activate\n"
+                              "and sets the variable value to the toState when the transition begins.")
+                    .manager (&_file.m_var_manager)();
+                EnumEdit<Hkx::e_hkbStateMachine_StartStateMode>(obj.getByName("startStateMode"), file,
+                                                                "How to set the start state.")();
+
+                fullTableSeparator();
+
+                EvtPickerEdit(obj.getByName("returnToPreviousStateEventId"), file,
+                              "If this event is received, the state machine returns to the previous state if there is an appropriate transition defined.")
+                    .manager (&_file.m_evt_manager)();
+                EvtPickerEdit(obj.getByName("randomTransitionEventId"), file,
+                              "If this event is received, the state machine chooses a random transition from among those available.\n\n"
+                              "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.")
+                    .manager (&_file.m_evt_manager)();
+                EvtPickerEdit(obj.getByName("transitionToNextHigherStateEventId"), file,
+                              "If the event is received, the state machine chooses a state with the id higher than the m_currentStateId and do a transition to that state.\n\n"
+                              "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.\n"
+                              "If no appropriate transition is found, an immediate transition will occur.")
+                    .manager (&_file.m_evt_manager)();
+                EvtPickerEdit(obj.getByName("transitionToNextLowerStateEventId"), file,
+                              "If the event is received, the state machine chooses a state with the id lower than the m_currentStateId and do a transition to that state.\n\n"
+                              "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.\n"
+                              "If no appropriate transition is found, an immediate transition will occur.")
+                    .manager (&_file.m_evt_manager)();
+
+                fullTableSeparator();
+
+                RefEdit<Hkx::g_class_transition_array>(obj.getByName("wildcardTransitions"), file,
+                                                       "the list of transitions from any state (don't have a specific from state)")();
+
+                fullTableSeparator();
+
+                BoolEdit(obj.getByName("wrapAroundStateId"), file,
+                         "This decides whether to transition when the m_currentStateId is maximum and m_transitionToNextHigherStateEventId is set\n"
+                         "m_currentStateId is minimum and m_transitionToNextLowerStateEventId is set.\n\n"
+                         "If this is set to false there would be no transition.\n"
+                         "Otherwise there would be a transition but in the first case the next state id will be a lower than the current one\n"
+                         "and in the second case the next state id would be higher than the current state id.")();
+                ScalarEdit<ImGuiDataType_S8>(obj.getByName("maxSimultaneousTransitions"), file,
+                                             "The number of transitions that can be active at once.\n\n"
+                                             "When a transition B interrupts another transition A, the state machine can continue playing A an input to B.\n"
+                                             "If a transition is triggered when there are already m_maxSimultaneousTransitions active transitions,\n"
+                                             "then the oldest transition will be immediately ended to make room for a new one.")();
+                EnumEdit<Hkx::e_hkbStateMachine_StateMachineSelfTransitionMode>(obj.getByName("selfTransitionMode"), file,
+                                                                                "How to deal with self-transitions (when the state machine is transitioned to while still active)().");
+
+                ImGui::EndTable();
+            }
+
             ImGui::TableNextColumn();
-            ImGui::Indent(10);
-            show_hkbEvent(obj.getByName("eventToSendWhenStateOrTransitionChanges").first_child(), file);
-            ImGui::Indent(-10);
-
-            fullTableSeparator();
-
-            refEdit(obj.getByName("startStateChooser"), {"hkbStateChooser"}, file,
-                    "an object that chooses the start state"); // this one in my ver replaced by startStateIdSelector
-            StateEdit(obj.getByName("startStateId"), file).state_machine(obj)();
-            VarPickerEdit(obj.getByName("syncVariableIndex"), file,
-                          "We use variables to sync the start state of the state machine.\n\n"
-                          "The value of this index currently must be initialized to the state id which the user wants the start state to be.\n"
-                          "The state machine syncs it start state by setting the value of the start state to that of the variable during activate\n"
-                          "and sets the variable value to the toState when the transition begins.")
-                .manager (&file.m_var_manager)();
-            EnumEdit<Hkx::e_hkbStateMachine_StartStateMode>(obj.getByName("startStateMode"), file,
-                                                            "How to set the start state.")();
-
-            fullTableSeparator();
-
-            EvtPickerEdit(obj.getByName("returnToPreviousStateEventId"), file,
-                          "If this event is received, the state machine returns to the previous state if there is an appropriate transition defined.")
-                .manager (&file.m_evt_manager)();
-            EvtPickerEdit(obj.getByName("randomTransitionEventId"), file,
-                          "If this event is received, the state machine chooses a random transition from among those available.\n\n"
-                          "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.")
-                .manager (&file.m_evt_manager)();
-            EvtPickerEdit(obj.getByName("transitionToNextHigherStateEventId"), file,
-                          "If the event is received, the state machine chooses a state with the id higher than the m_currentStateId and do a transition to that state.\n\n"
-                          "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.\n"
-                          "If no appropriate transition is found, an immediate transition will occur.")
-                .manager (&file.m_evt_manager)();
-            EvtPickerEdit(obj.getByName("transitionToNextLowerStateEventId"), file,
-                          "If the event is received, the state machine chooses a state with the id lower than the m_currentStateId and do a transition to that state.\n\n"
-                          "The event of the transition is ignored, but all other considerations of whether the transition should be taken are considered.\n"
-                          "If no appropriate transition is found, an immediate transition will occur.")
-                .manager (&file.m_evt_manager)();
-
-            fullTableSeparator();
-
-            refEdit(obj.getByName("wildcardTransitions"), {"hkbStateMachineTransitionInfoArray"}, file,
-                    "the list of transitions from any state (don't have a specific from state)");
-
-            fullTableSeparator();
-
-            BoolEdit(obj.getByName("wrapAroundStateId"), file,
-                     "This decides whether to transition when the m_currentStateId is maximum and m_transitionToNextHigherStateEventId is set\n"
-                     "m_currentStateId is minimum and m_transitionToNextLowerStateEventId is set.\n\n"
-                     "If this is set to false there would be no transition.\n"
-                     "Otherwise there would be a transition but in the first case the next state id will be a lower than the current one\n"
-                     "and in the second case the next state id would be higher than the current state id.")();
-            ScalarEdit<ImGuiDataType_S8>(obj.getByName("maxSimultaneousTransitions"), file,
-                                         "The number of transitions that can be active at once.\n\n"
-                                         "When a transition B interrupts another transition A, the state machine can continue playing A an input to B.\n"
-                                         "If a transition is triggered when there are already m_maxSimultaneousTransitions active transitions,\n"
-                                         "then the oldest transition will be immediately ended to make room for a new one.")();
-            EnumEdit<Hkx::e_hkbStateMachine_StateMachineSelfTransitionMode>(obj.getByName("selfTransitionMode"), file,
-                                                                            "How to deal with self-transitions (when the state machine is transitioned to while still active)().");
+            refList(obj.getByName("states"), {"hkbStateMachineStateInfo"}, file, "stateId", "name", "States");
 
             ImGui::EndTable();
         }
-
-        ImGui::TableNextColumn();
-        refList(obj.getByName("states"), {"hkbStateMachineStateInfo"}, file, "stateId", "name", "States");
-
-        ImGui::EndTable();
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbStateMachineStateInfo)
 {
-    if (ImGui::BeginTable("hkbStateMachineStateInfo1", 4, EditAreaTableFlag))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        auto& file = Hkx::HkxFileManager::getSingleton()->getCurrentFile();
-
-        StringEdit(obj.getByName("name"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-        ScalarEdit<ImGuiDataType_S32>(obj.getByName("stateId"), file)();
-        SliderScalarEdit(obj.getByName("probability"), file,
-                         "The state probability.  When choosing a random start state, each state is weighted according to its probability.\n"
-                         "The probabilities of all of the states being considered are normalized so that their sum is 1.\n"
-                         "When choosing a random transition, each transition in weighted according to the probability of the to-state.")
-            .lb(0.0f)
-            .ub(1.0f)();
-        BoolEdit(obj.getByName("enable"), file,
-                 "Enable this state. Otherwise, it will be inaccessible.")();
-        // listeners seems unused
-
-        fullTableSeparator();
-
-        refEdit(obj.getByName("generator"), std::vector(Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()), file,
-                "The generator associated with this state.");
-        refEdit(obj.getByName("transitions"), {"hkbStateMachineTransitionInfoArray"}, file,
-                "The transitions out of this state.");
-        fullTableSeparator();
-
-        auto enter_events = obj.getByName("enterNotifyEvents");
-        refEdit(enter_events, {"hkbStateMachineEventPropertyArray"}, file,
-                "These events are sent when the state is entered.");
-        auto exit_events = obj.getByName("exitNotifyEvents");
-        refEdit(exit_events, {"hkbStateMachineEventPropertyArray"}, file,
-                "These events are sent when the state is exited.");
-
-        if (auto node = file.getObj(enter_events.text().as_string()); node)
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        if (ImGui::BeginTable("hkbStateMachineStateInfo1", 4, EditAreaTableFlag))
         {
-            ImGui::TableNextColumn();
-            ImGui::PushID(0);
-            show_hkbStateMachineEventPropertyArray(node, file);
-            ImGui::PopID();
-            ImGui::TableNextColumn();
-        }
+            StringEdit(obj.getByName("name"), file)();
+            RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+            ScalarEdit<ImGuiDataType_S32>(obj.getByName("stateId"), file)();
+            SliderScalarEdit(obj.getByName("probability"), file,
+                             "The state probability.  When choosing a random start state, each state is weighted according to its probability.\n"
+                             "The probabilities of all of the states being considered are normalized so that their sum is 1.\n"
+                             "When choosing a random transition, each transition in weighted according to the probability of the to-state.")
+                .lb(0.0f)
+                .ub(1.0f)();
+            BoolEdit(obj.getByName("enable"), file,
+                     "Enable this state. Otherwise, it will be inaccessible.")();
+            // listeners seems unused
 
-        if (auto node = file.getObj(exit_events.text().as_string()); node)
-        {
-            ImGui::TableNextColumn();
-            ImGui::PushID(1);
-            show_hkbStateMachineEventPropertyArray(node, file);
-            ImGui::PopID();
-            ImGui::TableNextColumn();
-        }
+            fullTableSeparator();
 
-        ImGui::EndTable();
+            RefEdit<Hkx::g_class_generators>(obj.getByName("generator"), file,
+                                             "The generator associated with this state.")();
+            RefEdit<Hkx::g_class_transition_array>(obj.getByName("transitions"), file,
+                                                   "The transitions out of this state.")();
+            fullTableSeparator();
+
+            auto enter_events = obj.getByName("enterNotifyEvents");
+            RefEdit<Hkx::g_class_events_array>(enter_events, file,
+                                               "These events are sent when the state is entered.")();
+            auto exit_events = obj.getByName("exitNotifyEvents");
+            RefEdit<Hkx::g_class_events_array>(exit_events, file,
+                                               "These events are sent when the state is exited.")();
+
+            if (auto node = file.getObj(enter_events.text().as_string()); node)
+            {
+                ImGui::TableNextColumn();
+                ImGui::PushID(0);
+                show_hkbStateMachineEventPropertyArray(node, file);
+                ImGui::PopID();
+                ImGui::TableNextColumn();
+            }
+
+            if (auto node = file.getObj(exit_events.text().as_string()); node)
+            {
+                ImGui::TableNextColumn();
+                ImGui::PushID(1);
+                show_hkbStateMachineEventPropertyArray(node, file);
+                ImGui::PopID();
+                ImGui::TableNextColumn();
+            }
+
+            ImGui::EndTable();
+        }
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbStateMachineTransitionInfoArray)
@@ -591,7 +636,7 @@ UICLASS(hkbBlendingTransitionEffect)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
         fullTableSeparator();
 
@@ -626,14 +671,14 @@ UICLASS(hkbBlenderGeneratorChild)
 {
     if (ImGui::BeginTable("hkbBlenderGeneratorChild", 2, EditAreaTableFlag))
     {
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("generator"), std::vector(Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()), file,
-                "The generator associated with this child.");
-        refEdit(obj.getByName("boneWeights"), {"hkbBoneWeightArray"}, file,
-                "A weight for each bone");
+        RefEdit<Hkx::g_class_generators>(obj.getByName("generator"), file,
+                                         "The generator associated with this child.")();
+        RefEdit<Hkx::g_class_bone_weights>(obj.getByName("boneWeights"), file,
+                                           "A weight for each bone")();
         ScalarEdit(obj.getByName("weight"), file,
                    "The blend weight for this child.")();
         ScalarEdit(obj.getByName("worldFromModelWeight"), file,
@@ -667,7 +712,7 @@ UICLASS(hkbBlenderGenerator)
         {
             StringEdit(obj.getByName("name"), file)();
             ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-            refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+            RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
             fullTableSeparator();
 
@@ -704,9 +749,9 @@ UICLASS(BSBoneSwitchGeneratorBoneData)
 {
     if (ImGui::BeginTable("BSBoneSwitchGeneratorBoneData", 2, EditAreaTableFlag))
     {
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-        refEdit(obj.getByName("pGenerator"), std::vector(Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()), file);
-        refEdit(obj.getByName("spBoneWeight"), {"hkbBoneWeightArray"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+        RefEdit<Hkx::g_class_generators>(obj.getByName("pGenerator"), file)();
+        RefEdit<Hkx::g_class_bone_weights>(obj.getByName("spBoneWeight"), file)();
 
         ImGui::EndTable();
     }
@@ -736,8 +781,8 @@ UICLASS(BSBoneSwitchGenerator)
         {
             StringEdit(obj.getByName("name"), file)();
             ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-            refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-            refEdit(obj.getByName("pDefaultGenerator"), {"BSBoneSwitchGeneratorBoneData"}, file);
+            RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+            RefEdit<Hkx::g_class_boneswitch_data>(obj.getByName("pDefaultGenerator"), file)();
 
             ImGui::EndTable();
         }
@@ -756,7 +801,7 @@ UICLASS(hkbBoneWeightArray)
 {
     if (ImGui::BeginTable("hkbBoneWeightArray1", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
     {
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
         ImGui::EndTable();
     }
     ImGui::Separator();
@@ -803,7 +848,7 @@ UICLASS(hkbBoneIndexArray)
 {
     if (ImGui::BeginTable("hkbBoneIndexArray", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
     {
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
         auto bone_indices = obj.getByName("boneIndices");
 
@@ -871,61 +916,67 @@ UICLASS(hkbBoneIndexArray)
 
 UICLASS(hkbClipTriggerArray)
 {
-    static pugi::xml_node obj_cache;
-    static pugi::xml_node edit_trigger = {};
-    if (obj_cache != obj)
-        edit_trigger = {};
-    obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
-
-    if (ImGui::BeginTable("hkbClipTriggerArray1", 2, ImGuiTableFlags_Resizable))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ImGui::TableSetupColumn("triggers", ImGuiTableColumnFlags_WidthFixed, 200.0F);
-        ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+        Hkx::BehaviourFile&   _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        static pugi::xml_node obj_cache;
+        static pugi::xml_node edit_trigger = {};
+        if (obj_cache != obj)
+            edit_trigger = {};
+        obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
 
-        ImGui::TableNextColumn();
-        auto triggers_node = obj.getByName("triggers");
-
-        ImGui::AlignTextToFramePadding();
-
-        objLiveEditList(obj.getByName("triggers"), edit_trigger, Hkx::g_def_hkbClipTrigger, file, "triggers",
-                        [&file](auto node) { return file.m_evt_manager.getEntry(node.getByName("event").first_child().getByName("id").text().as_uint()).getName(); });
-
-        ImGui::TableNextColumn();
-        if (edit_trigger)
+        if (ImGui::BeginTable("hkbClipTriggerArray1", 2, ImGuiTableFlags_Resizable))
         {
-            if (ImGui::BeginTable("hkbClipTriggerArray2", 2, EditAreaTableFlag))
+            ImGui::TableSetupColumn("triggers", ImGuiTableColumnFlags_WidthFixed, 200.0F);
+            ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextColumn();
+            auto triggers_node = obj.getByName("triggers");
+
+            ImGui::AlignTextToFramePadding();
+
+            objLiveEditList(obj.getByName("triggers"), edit_trigger, Hkx::g_def_hkbClipTrigger, "triggers",
+                            [&_file](auto node) { return _file.m_evt_manager.getEntry(node.getByName("event").first_child().getByName("id").text().as_uint()).getName(); });
+
+            ImGui::TableNextColumn();
+            if (edit_trigger)
             {
-                ScalarEdit(edit_trigger.getByName("localTime"), file,
-                           "The local time at which the trigger is attached.\n\n"
-                           "This time is relative to the remaining portion of the clip after cropping.")();
+                if (ImGui::BeginTable("hkbClipTriggerArray2", 2, EditAreaTableFlag))
+                {
+                    ScalarEdit(edit_trigger.getByName("localTime"), file,
+                               "The local time at which the trigger is attached.\n\n"
+                               "This time is relative to the remaining portion of the clip after cropping.")();
 
-                ImGui::TableNextColumn();
-                ImGui::BulletText("event");
-                addTooltip("The event to send when the time comes.");
-                ImGui::TableNextColumn();
+                    ImGui::TableNextColumn();
+                    ImGui::BulletText("event");
+                    addTooltip("The event to send when the time comes.");
+                    ImGui::TableNextColumn();
 
-                ImGui::Indent(10);
-                show_hkbEvent(edit_trigger.getByName("event").first_child(), file);
-                ImGui::Indent(-10);
+                    ImGui::Indent(10);
+                    show_hkbEvent(edit_trigger.getByName("event").first_child(), file);
+                    ImGui::Indent(-10);
 
-                BoolEdit(edit_trigger.getByName("relativeToEndOfClip"), file,
-                         "Whether m_localTime is relative to the end of the clip.\n\n"
-                         "If false, m_localTime should be positive or zero.\n"
-                         "If true, m_localTime should be negative or zero.")();
-                BoolEdit(edit_trigger.getByName("acyclic"), file,
-                         "Whether the trigger is a cyclic or acyclic.\n\n"
-                         "m_acyclic and m_relativeToEndOfClip are mutually exclusive.")();
-                BoolEdit(edit_trigger.getByName("isAnnotation"), file,
-                         "Whether or not this trigger was converted from an annotation attached to the animation.")();
+                    BoolEdit(edit_trigger.getByName("relativeToEndOfClip"), file,
+                             "Whether m_localTime is relative to the end of the clip.\n\n"
+                             "If false, m_localTime should be positive or zero.\n"
+                             "If true, m_localTime should be negative or zero.")();
+                    BoolEdit(edit_trigger.getByName("acyclic"), file,
+                             "Whether the trigger is a cyclic or acyclic.\n\n"
+                             "m_acyclic and m_relativeToEndOfClip are mutually exclusive.")();
+                    BoolEdit(edit_trigger.getByName("isAnnotation"), file,
+                             "Whether or not this trigger was converted from an annotation attached to the animation.")();
 
-                ImGui::EndTable();
+                    ImGui::EndTable();
+                }
             }
-        }
-        else
-            ImGui::TextDisabled("Not editing any trigger");
+            else
+                ImGui::TextDisabled("Not editing any trigger");
 
-        ImGui::EndTable();
+            ImGui::EndTable();
+        }
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbClipGenerator)
@@ -934,7 +985,7 @@ UICLASS(hkbClipGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
         AnimEdit(obj.getByName("animationName"), file,
                  "The name of the animation to play.")();
 
@@ -966,8 +1017,8 @@ UICLASS(hkbClipGenerator)
         FlagEdit<Hkx::f_hkbClipGenerator_ClipFlags>(obj.getByName("flags"), file,
                                                     "Flags for specialized behavior.");
 
-        refEdit(obj.getByName("triggers"), {"hkbClipTriggerArray"}, file,
-                "Triggers (events that occur at specific times).");
+        RefEdit<Hkx::g_class_triggers>(obj.getByName("triggers"), file,
+                                       "Triggers (events that occur at specific times).")();
 
         ImGui::EndTable();
     }
@@ -987,12 +1038,12 @@ UICLASS(BSSynchronizedClipGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
         ScalarEdit<ImGuiDataType_S16>(obj.getByName("sAnimationBindingIndex"), file)();
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("pClipGenerator"), {"hkbClipGenerator"}, file);
+        RefEdit<Hkx::g_class_clip>(obj.getByName("pClipGenerator"), file);
         StringEdit(obj.getByName("SyncAnimPrefix"), file)();
 
         fullTableSeparator();
@@ -1024,7 +1075,7 @@ UICLASS(hkbManualSelectorGenerator)
         {
             StringEdit(obj.getByName("name"), file)();
             ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-            refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+            RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
             fullTableSeparator();
 
@@ -1049,14 +1100,14 @@ UICLASS(hkbModifierGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("modifier"), {Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end()}, file,
-                "The modifier being applied to a generator.");
-        refEdit(obj.getByName("generator"), {Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()}, file,
-                "The generator to which a modifier is being applied.");
+        RefEdit<Hkx::g_class_modifiers>(obj.getByName("modifier"), file,
+                                        "The modifier being applied to a generator.")();
+        RefEdit<Hkx::g_class_generators>(obj.getByName("generator"), file,
+                                         "The generator to which a modifier is being applied.")();
 
         ImGui::EndTable();
     }
@@ -1068,7 +1119,7 @@ UICLASS(hkbBehaviorReferenceGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
         StringEdit(obj.getByName("behaviorName"), file,
                    "the name of the behavior")();
 
@@ -1078,58 +1129,64 @@ UICLASS(hkbBehaviorReferenceGenerator)
 
 UICLASS(hkbPoseMatchingGenerator)
 {
-    if (ImGui::BeginTable("hkbPoseMatchingGenerator", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 6 + 2 * 3}))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        QuadEdit(obj.getByName("worldFromModelRotation"), file,
-                 "The rotation of the frame of reference used for pose matching.")();
-        EnumEdit<Hkx::e_hkbPoseMatchingGenerator_Mode>(obj.getByName("mode"), file,
-                                                       "Whether matching poses or playing out the remaining animation.")();
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        if (ImGui::BeginTable("hkbPoseMatchingGenerator", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 6 + 2 * 3}))
+        {
+            QuadEdit(obj.getByName("worldFromModelRotation"), file,
+                     "The rotation of the frame of reference used for pose matching.")();
+            EnumEdit<Hkx::e_hkbPoseMatchingGenerator_Mode>(obj.getByName("mode"), file,
+                                                           "Whether matching poses or playing out the remaining animation.")();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        SliderScalarEdit(obj.getByName("blendSpeed"), file,
-                         "Speed at which to blend in and out the blend weights (in weight units per second).lb( 0.0001f).ub( 1000.0f).")();
-        SliderScalarEdit(obj.getByName("minSpeedToSwitch"), file,
-                         "Don't switch if the pelvis speed is below this.")
-            .lb(0.0f)
-            .ub(100.0f)();
-        SliderScalarEdit(obj.getByName("minSwitchTimeNoError"), file,
-                         "The minimum time between switching matches when the matching error is 0.\n\n"
-                         "In order to avoid too much oscillating back and forth between matches, we introduce some hysteresis.\n"
-                         "We only allow a switch to a new match after a minimum amount of time has passed without a better match being found.\n"
-                         "The time bound is a linear function of the error.")
-            .lb(0.0f)
-            .ub(100.0f)();
-        SliderScalarEdit(obj.getByName("minSwitchTimeFullError"), file,
-                         "The minimum time between switching matches when the matching error is 1.")
-            .lb(0.0f)
-            .ub(100.0f)();
+            SliderScalarEdit(obj.getByName("blendSpeed"), file,
+                             "Speed at which to blend in and out the blend weights (in weight units per second).lb( 0.0001f).ub( 1000.0f).")();
+            SliderScalarEdit(obj.getByName("minSpeedToSwitch"), file,
+                             "Don't switch if the pelvis speed is below this.")
+                .lb(0.0f)
+                .ub(100.0f)();
+            SliderScalarEdit(obj.getByName("minSwitchTimeNoError"), file,
+                             "The minimum time between switching matches when the matching error is 0.\n\n"
+                             "In order to avoid too much oscillating back and forth between matches, we introduce some hysteresis.\n"
+                             "We only allow a switch to a new match after a minimum amount of time has passed without a better match being found.\n"
+                             "The time bound is a linear function of the error.")
+                .lb(0.0f)
+                .ub(100.0f)();
+            SliderScalarEdit(obj.getByName("minSwitchTimeFullError"), file,
+                             "The minimum time between switching matches when the matching error is 1.")
+                .lb(0.0f)
+                .ub(100.0f)();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        EvtPickerEdit(obj.getByName("startPlayingEventId"), file,
-                      "An event to set m_mode to MODE_PLAY.")
-            .manager (&file.m_evt_manager)();
-        EvtPickerEdit(obj.getByName("startMatchingEventId"), file,
-                      "An event to set m_mode to MODE_MATCH.")
-            .manager (&file.m_evt_manager)();
+            EvtPickerEdit(obj.getByName("startPlayingEventId"), file,
+                          "An event to set m_mode to MODE_PLAY.")
+                .manager (&_file.m_evt_manager)();
+            EvtPickerEdit(obj.getByName("startMatchingEventId"), file,
+                          "An event to set m_mode to MODE_MATCH.")
+                .manager (&_file.m_evt_manager)();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
-        BoneEdit(obj.getByName("rootBoneIndex"), file,
-                 "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
-        BoneEdit(obj.getByName("otherBoneIndex"), file,
-                 "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
-        BoneEdit(obj.getByName("anotherBoneIndex"), file,
-                 "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
-        BoneEdit(obj.getByName("pelvisIndex"), file,
-                 "The (ragdoll) pelvis bone used to measure the speed of the ragdoll.")();
+            auto& skel_file = Hkx::HkxFileManager::getSingleton()->m_skel_file;
+            BoneEdit(obj.getByName("rootBoneIndex"), file,
+                     "The root (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
+            BoneEdit(obj.getByName("otherBoneIndex"), file,
+                     "A second (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
+            BoneEdit(obj.getByName("anotherBoneIndex"), file,
+                     "A third (ragdoll) bone used for pose matching. If this is -1, the index is taken from the character's hkbBoneInfo.")();
+            BoneEdit(obj.getByName("pelvisIndex"), file,
+                     "The (ragdoll) pelvis bone used to measure the speed of the ragdoll.")();
 
-        ImGui::EndTable();
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        show_hkbBlenderGenerator(obj, file);
     }
-    ImGui::Separator();
-    show_hkbBlenderGenerator(obj, file);
+    else
+        sayIncompatible();
 }
 
 UICLASS(BSCyclicBlendTransitionGenerator)
@@ -1138,8 +1195,8 @@ UICLASS(BSCyclicBlendTransitionGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-        refEdit(obj.getByName("pBlenderGenerator"), {"hkbBlenderGenerator", "hkbPoseMatchingGenerator"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+        RefEdit<Hkx::g_class_blender_gens>(obj.getByName("pBlenderGenerator"), file)();
 
         fullTableSeparator();
 
@@ -1184,8 +1241,8 @@ UICLASS(BSiStateTaggingGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
-        refEdit(obj.getByName("pDefaultGenerator"), {Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
+        RefEdit<Hkx::g_class_generators>(obj.getByName("pDefaultGenerator"), file)();
 
         fullTableSeparator();
 
@@ -1202,12 +1259,12 @@ UICLASS(BSOffsetAnimationGenerator)
     {
         StringEdit(obj.getByName("name"), file)();
         ScalarEdit<ImGuiDataType_U32>(obj.getByName("userData"), file)();
-        refEdit(obj.getByName("variableBindingSet"), {"hkbVariableBindingSet"}, file);
+        RefEdit<Hkx::g_class_binding>(obj.getByName("variableBindingSet"), file)();
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("pDefaultGenerator"), {Hkx::g_class_generators.begin(), Hkx::g_class_generators.end()}, file);
-        refEdit(obj.getByName("pOffsetClipGenerator"), {"hkbClipGenerator"}, file);
+        RefEdit<Hkx::g_class_generators>(obj.getByName("pDefaultGenerator"), file)();
+        RefEdit<Hkx::g_class_clip>(obj.getByName("pOffsetClipGenerator"), file)();
 
         fullTableSeparator();
 
@@ -1243,46 +1300,52 @@ UICLASS(hkbModifierList)
 
 UICLASS(hkbExpressionDataArray)
 {
-    static pugi::xml_node obj_cache;
-    static pugi::xml_node edit_expr = {};
-    if (obj_cache != obj)
-        edit_expr = {};
-    obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
-
-    if (ImGui::BeginTable("hkbExpressionDataArray1", 2, ImGuiTableFlags_Resizable))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ImGui::TableSetupColumn("exprs", ImGuiTableColumnFlags_WidthFixed, 200.0F);
-        ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+        Hkx::BehaviourFile&   _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        static pugi::xml_node obj_cache;
+        static pugi::xml_node edit_expr = {};
+        if (obj_cache != obj)
+            edit_expr = {};
+        obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
 
-        ImGui::TableNextColumn();
-
-        objLiveEditList(obj.getByName("expressionsData"), edit_expr, Hkx::g_def_hkbExpressionData, file, "expressions",
-                        [](auto node) { return node.getByName("expression").text().as_string(); });
-
-        ImGui::TableNextColumn();
-        if (edit_expr)
+        if (ImGui::BeginTable("hkbExpressionDataArray1", 2, ImGuiTableFlags_Resizable))
         {
-            if (ImGui::BeginTable("hkbExpressionDataArray2", 2, EditAreaTableFlag))
+            ImGui::TableSetupColumn("exprs", ImGuiTableColumnFlags_WidthFixed, 200.0F);
+            ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextColumn();
+
+            objLiveEditList(obj.getByName("expressionsData"), edit_expr, Hkx::g_def_hkbExpressionData, "expressions",
+                            [](auto node) { return node.getByName("expression").text().as_string(); });
+
+            ImGui::TableNextColumn();
+            if (edit_expr)
             {
-                StringEdit(edit_expr.getByName("expression"), file,
-                           "Expression that's input by the user in the form: \"variablename = expression\" or \"eventname = boolean expression\".")();
-                VarPickerEdit(edit_expr.getByName("assignmentVariableIndex"), file,
-                              "This is the variable that we will assign result to (-1 if not found). For internal use.")
-                    .manager (&file.m_var_manager)();
-                EvtPickerEdit(edit_expr.getByName("assignmentEventIndex"), file,
-                              "This is the event we will raise if result > 0 (-1 if not found). For internal use.")
-                    .manager (&file.m_evt_manager)();
-                EnumEdit<Hkx::e_hkbExpressionData_ExpressionEventMode>(edit_expr.getByName("eventMode"), file,
-                                                                       "Under what circumstances to send the event.")();
+                if (ImGui::BeginTable("hkbExpressionDataArray2", 2, EditAreaTableFlag))
+                {
+                    StringEdit(edit_expr.getByName("expression"), file,
+                               "Expression that's input by the user in the form: \"variablename = expression\" or \"eventname = boolean expression\".")();
+                    VarPickerEdit(edit_expr.getByName("assignmentVariableIndex"), file,
+                                  "This is the variable that we will assign result to (-1 if not found). For internal use.")
+                        .manager (&_file.m_var_manager)();
+                    EvtPickerEdit(edit_expr.getByName("assignmentEventIndex"), file,
+                                  "This is the event we will raise if result > 0 (-1 if not found). For internal use.")
+                        .manager (&_file.m_evt_manager)();
+                    EnumEdit<Hkx::e_hkbExpressionData_ExpressionEventMode>(edit_expr.getByName("eventMode"), file,
+                                                                           "Under what circumstances to send the event.")();
 
-                ImGui::EndTable();
+                    ImGui::EndTable();
+                }
             }
-        }
-        else
-            ImGui::TextDisabled("Not editing any expression");
+            else
+                ImGui::TextDisabled("Not editing any expression");
 
-        ImGui::EndTable();
+            ImGui::EndTable();
+        }
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbEvaluateExpressionModifier)
@@ -1293,8 +1356,8 @@ UICLASS(hkbEvaluateExpressionModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("expressions"), {"hkbExpressionDataArray"}, file,
-                "A set of expressions to be evaluated.");
+        RefEdit<Hkx::g_class_expr_array>(obj.getByName("expressions"), file,
+                                         "A set of expressions to be evaluated.")();
 
         ImGui::EndTable();
     }
@@ -1307,79 +1370,91 @@ UICLASS(hkbEvaluateExpressionModifier)
 
 UICLASS(hkbEventDrivenModifier)
 {
-    if (ImGui::BeginTable("hkbEventDrivenModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 2}))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        show_hkbModifier(obj, file);
-        ImGui::EndTable();
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        if (ImGui::BeginTable("hkbEventDrivenModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 2}))
+        {
+            show_hkbModifier(obj, file);
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        if (ImGui::BeginTable("hkbEventDrivenModifier2", 2, EditAreaTableFlag))
+        {
+            RefEdit<Hkx::g_class_modifiers>(obj.getByName("modifier"), file,
+                                            "The nested modifier that is to be wrapped.")();
+
+            fullTableSeparator();
+
+            EvtPickerEdit(obj.getByName("activateEventId"), file,
+                          "Event used to activate the wrapped modifier")
+                .manager (&_file.m_evt_manager)();
+            EvtPickerEdit(obj.getByName("deactivateEventId"), file,
+                          "Event used to deactivate the wrapped modifier")
+                .manager (&_file.m_evt_manager)();
+            BoolEdit(obj.getByName("activeByDefault"), file)();
+
+            ImGui::EndTable();
+        }
     }
-    ImGui::Separator();
-    if (ImGui::BeginTable("hkbEventDrivenModifier2", 2, EditAreaTableFlag))
-    {
-        refEdit(obj.getByName("modifier"), {Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end()}, file,
-                "The nested modifier that is to be wrapped.");
-
-        fullTableSeparator();
-
-        EvtPickerEdit(obj.getByName("activateEventId"), file,
-                      "Event used to activate the wrapped modifier")
-            .manager (&file.m_evt_manager)();
-        EvtPickerEdit(obj.getByName("deactivateEventId"), file,
-                      "Event used to deactivate the wrapped modifier")
-            .manager (&file.m_evt_manager)();
-        BoolEdit(obj.getByName("activeByDefault"), file)();
-
-        ImGui::EndTable();
-    }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbEventRangeDataArray)
 {
-    static pugi::xml_node obj_cache;
-    static pugi::xml_node edit_range = {};
-    if (obj_cache != obj)
-        edit_range = {};
-    obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
-
-    if (ImGui::BeginTable("hkbEventRangeDataArray1", 2, ImGuiTableFlags_Resizable))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        ImGui::TableSetupColumn("ranges", ImGuiTableColumnFlags_WidthFixed, 200.0F);
-        ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+        Hkx::BehaviourFile&   _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        static pugi::xml_node obj_cache;
+        static pugi::xml_node edit_range = {};
+        if (obj_cache != obj)
+            edit_range = {};
+        obj_cache = obj; // workaround to prevent crashing between files, asserting that may only be one menu at the same time
 
-        ImGui::TableNextColumn();
-
-        objLiveEditList(obj.getByName("eventData"), edit_range, Hkx::g_def_hkbEventRangeData, file, "ranges",
-                        [&file](auto node) { return fmt::format("{} {}",
-                                                                node.getByName("upperBound").text().as_float(),
-                                                                file.m_evt_manager.getEntry(node.getByName("event").first_child().getByName("id").text().as_int()).getName()); });
-
-        ImGui::TableNextColumn();
-        if (edit_range)
+        if (ImGui::BeginTable("hkbEventRangeDataArray1", 2, ImGuiTableFlags_Resizable))
         {
-            if (ImGui::BeginTable("hkbEventRangeDataArray2", 2, EditAreaTableFlag))
+            ImGui::TableSetupColumn("ranges", ImGuiTableColumnFlags_WidthFixed, 200.0F);
+            ImGui::TableSetupColumn("editarea", ImGuiTableColumnFlags_WidthStretch);
+
+            ImGui::TableNextColumn();
+
+            objLiveEditList(obj.getByName("eventData"), edit_range, Hkx::g_def_hkbEventRangeData, "ranges",
+                            [&_file](auto node) { return fmt::format("{} {}",
+                                                                     node.getByName("upperBound").text().as_float(),
+                                                                     _file.m_evt_manager.getEntry(node.getByName("event").first_child().getByName("id").text().as_int()).getName()); });
+
+            ImGui::TableNextColumn();
+            if (edit_range)
             {
-                ScalarEdit(edit_range.getByName("upperBound"), file,
-                           "The highest value in this range.  The lowest value of this range is the upperBound from the previous range.")();
-                EnumEdit<Hkx::e_hkbEventRangeData_EventRangeMode>(edit_range.getByName("eventMode"), file,
-                                                                  "Under what circumstances to send the event.")();
+                if (ImGui::BeginTable("hkbEventRangeDataArray2", 2, EditAreaTableFlag))
+                {
+                    ScalarEdit(edit_range.getByName("upperBound"), file,
+                               "The highest value in this range.  The lowest value of this range is the upperBound from the previous range.")();
+                    EnumEdit<Hkx::e_hkbEventRangeData_EventRangeMode>(edit_range.getByName("eventMode"), file,
+                                                                      "Under what circumstances to send the event.")();
 
-                fullTableSeparator();
+                    fullTableSeparator();
 
-                ImGui::TableNextColumn();
-                ImGui::Text("event");
-                ImGui::TableNextColumn();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("event");
+                    ImGui::TableNextColumn();
 
-                ImGui::Indent(10);
-                show_hkbEvent(edit_range.getByName("event").first_child(), file);
-                ImGui::Indent(-10);
+                    ImGui::Indent(10);
+                    show_hkbEvent(edit_range.getByName("event").first_child(), file);
+                    ImGui::Indent(-10);
 
-                ImGui::EndTable();
+                    ImGui::EndTable();
+                }
             }
-        }
-        else
-            ImGui::TextDisabled("Not editing any range");
+            else
+                ImGui::TextDisabled("Not editing any range");
 
-        ImGui::EndTable();
+            ImGui::EndTable();
+        }
     }
+    else
+        sayIncompatible();
 }
 
 UICLASS(hkbEventsFromRangeModifier)
@@ -1397,8 +1472,8 @@ UICLASS(hkbEventsFromRangeModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("eventRanges"), {"hkbEventRangeDataArray"}, file,
-                "A series of intervals, each of which has an event associated with it. Note that these must be in increasing order.");
+        RefEdit<Hkx::g_class_event_ranges>(obj.getByName("eventRanges"), file,
+                                           "A series of intervals, each of which has an event associated with it. Note that these must be in increasing order.");
 
         ImGui::EndTable();
     }
@@ -1457,8 +1532,8 @@ UICLASS(hkbKeyframeBonesModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("keyframedBonesList"), {"hkbBoneIndexArray"}, file,
-                "Keyframed bone list that HAT can set.");
+        RefEdit<Hkx::g_class_key_bones>(obj.getByName("keyframedBonesList"), file,
+                                        "Keyframed bone list that HAT can set.")();
 
         ImGui::EndTable();
     }
@@ -1477,7 +1552,7 @@ UICLASS(hkbKeyframeBonesModifier)
 
         ImGui::TableNextColumn();
 
-        objLiveEditList(obj.getByName("keyframeInfo"), edit_info, Hkx::g_def_hkbKeyframeBonesModifier_KeyframeInfo, file, "keyframeInfo",
+        objLiveEditList(obj.getByName("keyframeInfo"), edit_info, Hkx::g_def_hkbKeyframeBonesModifier_KeyframeInfo, "keyframeInfo",
                         [](auto node) { return node.getByName("boneIndex").text().as_string(); });
 
         ImGui::TableNextColumn();
@@ -1512,10 +1587,10 @@ UICLASS(hkbPoweredRagdollControlsModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("bones"), {"hkbBoneIndexArray"}, file,
-                "The bones to be driven by the rigid body ragdoll controller.  If this is empty, all bones will be driven.");
-        refEdit(obj.getByName("boneWeights"), {"hkbBoneWeightArray"}, file,
-                "A weight for each bone of the ragdoll");
+        RefEdit<Hkx::g_class_bone_indices>(obj.getByName("bones"), file,
+                                           "The bones to be driven by the rigid body ragdoll controller.  If this is empty, all bones will be driven.")();
+        RefEdit<Hkx::g_class_bone_weights>(obj.getByName("boneWeights"), file,
+                                           "A weight for each bone of the ragdoll")();
 
         fullTableSeparator();
 
@@ -1581,8 +1656,8 @@ UICLASS(hkbRigidBodyRagdollControlsModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("bones"), {"hkbBoneIndexArray"}, file,
-                "The bones to be driven by the rigid body ragdoll controller.  If this is empty, all bones will be driven.");
+        RefEdit<Hkx::g_class_bone_indices>(obj.getByName("bones"), file,
+                                           "The bones to be driven by the rigid body ragdoll controller.  If this is empty, all bones will be driven.")();
 
         fullTableSeparator();
 
@@ -1810,7 +1885,7 @@ UICLASS(hkbFootIkControlsModifier)
 
         ImGui::TableNextColumn();
 
-        objLiveEditList(obj.getByName("legs"), edit_leg, Hkx::g_def_hkbFootIkControlsModifier_Leg, file, "legs",
+        objLiveEditList(obj.getByName("legs"), edit_leg, Hkx::g_def_hkbFootIkControlsModifier_Leg, "legs",
                         [](auto node) { return fmt::format("{}", getChildIndex(node)); });
 
         ImGui::TableNextColumn();
@@ -2271,7 +2346,7 @@ UICLASS(hkbDelayedModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("modifier"), {Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end()}, file);
+        RefEdit<Hkx::g_class_modifiers>(obj.getByName("modifier"), file)();
 
         fullTableSeparator();
 
@@ -2656,59 +2731,65 @@ UICLASS(BSIsActiveModifier)
 
 UICLASS(BSLookAtModifier)
 {
-    if (ImGui::BeginTable("BSLookAtModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 10 + 2 * 5}))
+    if (file.getType() == Hkx::HkxFile::kBehaviour)
     {
-        show_hkbModifier(obj, file);
+        Hkx::BehaviourFile& _file = *dynamic_cast<Hkx::BehaviourFile*>(&file);
+        if (ImGui::BeginTable("BSLookAtModifier1", 4, EditAreaTableFlag, {-FLT_MIN, 27 * 10 + 2 * 5}))
+        {
+            show_hkbModifier(obj, file);
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        BoolEdit(obj.getByName("lookAtTarget"), file)();
-        BoolEdit(obj.getByName("useBoneGains"), file)();
+            BoolEdit(obj.getByName("lookAtTarget"), file)();
+            BoolEdit(obj.getByName("useBoneGains"), file)();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        ScalarEdit(obj.getByName("onGain"), file)();
-        ScalarEdit(obj.getByName("offGain"), file)();
+            ScalarEdit(obj.getByName("onGain"), file)();
+            ScalarEdit(obj.getByName("offGain"), file)();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        ScalarEdit(obj.getByName("limitAngleDegrees"), file)();
-        ScalarEdit(obj.getByName("distanceTriglimitAngleThresholdDegreesger"), file)();
-        BoolEdit(obj.getByName("targetOutsideLimits"), file)();
-        BoolEdit(obj.getByName("continueLookOutsideOfLimit"), file)();
+            ScalarEdit(obj.getByName("limitAngleDegrees"), file)();
+            ScalarEdit(obj.getByName("distanceTriglimitAngleThresholdDegreesger"), file)();
+            BoolEdit(obj.getByName("targetOutsideLimits"), file)();
+            BoolEdit(obj.getByName("continueLookOutsideOfLimit"), file)();
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        ImGui::TableNextColumn();
-        ImGui::BulletText("targetOutOfLimitEvent");
-        ImGui::TableNextColumn();
-        show_hkbEvent(obj.getByName("targetOutOfLimitEvent").first_child(), file);
+            ImGui::TableNextColumn();
+            ImGui::BulletText("targetOutOfLimitEvent");
+            ImGui::TableNextColumn();
+            show_hkbEvent(obj.getByName("targetOutOfLimitEvent").first_child(), file);
 
-        fullTableSeparator();
+            fullTableSeparator();
 
-        BoolEdit(obj.getByName("lookAtCamera"), file)();
-        ScalarEdit(obj.getByName("lookAtCameraX"), file)();
-        ScalarEdit(obj.getByName("lookAtCameraY"), file)();
-        ScalarEdit(obj.getByName("lookAtCameraZ"), file)();
+            BoolEdit(obj.getByName("lookAtCamera"), file)();
+            ScalarEdit(obj.getByName("lookAtCameraX"), file)();
+            ScalarEdit(obj.getByName("lookAtCameraY"), file)();
+            ScalarEdit(obj.getByName("lookAtCameraZ"), file)();
 
-        ImGui::EndTable();
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        if (ImGui::BeginTable("BSLookAtModifier2", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
+        {
+            QuadEdit(obj.getByName("targetLocation"), file)();
+            ImGui::EndTable();
+        }
+        ImGui::Separator();
+        if (ImGui::BeginTable("BSLookAtModifier3", 2, ImGuiTableFlags_SizingStretchSame))
+        {
+            ImGui::TableNextColumn();
+            BSLookAtModifierBoneArray(obj.getByName("bones"), _file);
+            ImGui::TableNextColumn();
+            BSLookAtModifierBoneArray(obj.getByName("eyeBones"), _file);
+
+            ImGui::EndTable();
+        }
     }
-    ImGui::Separator();
-    if (ImGui::BeginTable("BSLookAtModifier2", 2, EditAreaTableFlag, {-FLT_MIN, 27}))
-    {
-        QuadEdit(obj.getByName("targetLocation"), file)();
-        ImGui::EndTable();
-    }
-    ImGui::Separator();
-    if (ImGui::BeginTable("BSLookAtModifier3", 2, ImGuiTableFlags_SizingStretchSame))
-    {
-        ImGui::TableNextColumn();
-        BSLookAtModifierBoneArray(obj.getByName("bones"), file);
-        ImGui::TableNextColumn();
-        BSLookAtModifierBoneArray(obj.getByName("eyeBones"), file);
-
-        ImGui::EndTable();
-    }
+    else
+        sayIncompatible();
 }
 
 UICLASS(BSModifyOnceModifier)
@@ -2719,8 +2800,8 @@ UICLASS(BSModifyOnceModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("pOnActivateModifier"), {Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end()}, file);
-        refEdit(obj.getByName("pOnDeactivateModifier"), {Hkx::g_class_modifiers.begin(), Hkx::g_class_modifiers.end()}, file);
+        RefEdit<Hkx::g_class_modifiers>(obj.getByName("pOnActivateModifier"), file)();
+        RefEdit<Hkx::g_class_modifiers>(obj.getByName("pOnDeactivateModifier"), file)();
 
         ImGui::EndTable();
     }
@@ -2764,7 +2845,7 @@ UICLASS(BSRagdollContactListenerModifier)
 
         fullTableSeparator();
 
-        refEdit(obj.getByName("bones"), {"hkbBoneIndexArray"}, file);
+        RefEdit<Hkx::g_class_bone_indices>(obj.getByName("bones"), file)();
 
         fullTableSeparator();
 
@@ -2845,7 +2926,7 @@ UICLASS(BSSpeedSamplerModifier)
 #        hkclass, show_##hkclass \
     }
 
-const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_node, Hkx::BehaviourFile&)>> g_class_ui_map =
+const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_node, Hkx::HkxFile&)>> g_class_ui_map =
     {UIMAPITEM(hkbBehaviorGraph),
      UIMAPITEM(hkbVariableBindingSet),
      UIMAPITEM(hkbStateMachine),
@@ -2914,7 +2995,7 @@ const robin_hood::unordered_map<std::string_view, std::function<void(pugi::xml_n
      UIMAPITEM(BSTweenerModifier),
      UIMAPITEM(BSSpeedSamplerModifier)};
 
-void showEditUi(pugi::xml_node hkobject, Hkx::BehaviourFile& file)
+void showEditUi(pugi::xml_node hkobject, Hkx::HkxFile& file)
 {
     auto hkclass = hkobject.attribute("class").as_string();
     if (g_class_ui_map.contains(hkclass))
