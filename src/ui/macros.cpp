@@ -8,6 +8,7 @@
 
 #include <imgui.h>
 #include <extern/imgui_stdlib.h>
+#include <spdlog/spdlog.h>
 
 namespace Haviour
 {
@@ -33,7 +34,7 @@ void MacroModal::show()
         ImGui::OpenPopup(getName());
     }
 
-    bool unused_open;
+    bool unused_open = true;
     if (ImGui::BeginPopupModal(getName(), &unused_open, ImGuiWindowFlags_NoScrollbar))
     {
         drawUi();

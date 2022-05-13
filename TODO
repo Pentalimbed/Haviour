@@ -37,8 +37,9 @@
 - 0.6.1a Dereference fix
 - 0.6.1a Picker listbox crash fix
 - 0.6.1a Sync clip gen ui fix
-- 0.6.1a Trigger array same event fix
-- 0.6.1a Object reindex top level object fix
+- 0.6.2a Trigger array same event fix
+- 0.6.2a Object reindex top level object fix
+- 0.6.2a Release build macro window fix
 
 Delete all children
 Behaviour diagnosis
