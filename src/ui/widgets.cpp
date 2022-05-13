@@ -656,12 +656,15 @@ void objLiveEditList(
 
     if (ImGui::BeginListBox(fmt::format("##{}", str_id).c_str(), ImVec2(-FLT_MIN, -FLT_MIN)))
     {
+        size_t idx = 0;
         for (auto item : hkparam.children())
         {
             const bool is_selected = edit_item == item;
             auto       disp_name   = disp_name_func(item);
+            ImGui::PushID(idx++);
             if (ImGui::Selectable(disp_name.c_str(), is_selected))
                 edit_item = item;
+            ImGui::PopID();
         }
         ImGui::EndListBox();
     }

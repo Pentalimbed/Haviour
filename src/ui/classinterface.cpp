@@ -1044,7 +1044,7 @@ UICLASS(BSSynchronizedClipGenerator)
 
         fullTableSeparator();
 
-        RefEdit<Hkx::g_class_clip>(obj.getByName("pClipGenerator"), file);
+        RefEdit<Hkx::g_class_clip>(obj.getByName("pClipGenerator"), file)();
         StringEdit(obj.getByName("SyncAnimPrefix"), file)();
 
         fullTableSeparator();

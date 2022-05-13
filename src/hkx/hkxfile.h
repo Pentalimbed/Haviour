@@ -86,14 +86,14 @@ public:
     void             delObj(std::string_view id);
     void             reindexObj(uint16_t start_id = 100);
 
-    virtual bool isObjEssential(std::string_view id) = 0;
+    virtual bool isObjEssential(std::string_view id) { return m_root_obj == getObj(id); };
 
 protected:
     bool m_loaded = false;
 
     std::string        m_path, m_filename;
     pugi::xml_document m_doc;
-    pugi::xml_node     m_data_node;
+    pugi::xml_node     m_data_node, m_root_obj;
     uint16_t           m_latest_id = 0;
 
     StringMap<pugi::xml_node>           m_obj_list;
@@ -141,7 +141,7 @@ public:
     void cleanupEvents();
     void cleanupProps();
 
-    pugi::xml_node m_root_obj, m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
+    pugi::xml_node m_graph_obj, m_graph_data_obj, m_graph_str_data_obj, m_var_value_obj; // Essential objects
 private:
 };
 

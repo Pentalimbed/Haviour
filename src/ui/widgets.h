@@ -202,7 +202,7 @@ bool linkedPropSelectable(Entry& prop)
         res = true;
     if constexpr (std::is_same_v<Entry, Hkx::Variable>)
         ImGui::PopStyleColor();
-    return false;
+    return res;
 };
 
 template <typename Manager>

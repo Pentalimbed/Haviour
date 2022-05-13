@@ -36,6 +36,9 @@
 - 0.6a Char prop in behavior file can edit type now
 - 0.6.1a Dereference fix
 - 0.6.1a Picker listbox crash fix
+- 0.6.1a Sync clip gen ui fix
+- 0.6.1a Trigger array same event fix
+- 0.6.1a Object reindex top level object fix
 
 Delete all children
 Behaviour diagnosis

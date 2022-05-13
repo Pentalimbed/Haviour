@@ -68,6 +68,14 @@ void HkxFile::loadFile(std::string_view path)
         uint16_t id = std::atoi(name.data() + 1); // There's a potential crash here...
         m_latest_id = std::max(id, m_latest_id);
     }
+
+    m_root_obj = m_data_node.find_child_by_attribute("class", "hkRootLevelContainer");
+    if (!m_root_obj)
+    {
+        file_logger->error("Couldn't find root level object!");
+        return;
+    }
+
     reindexObjInternal(); // in case some file don't follow the 4 digit indexing
 
     m_loaded = true;
@@ -362,6 +370,8 @@ void HkxFile::reindexObjInternal(uint16_t start_id)
 
     for (auto [key, obj] : m_obj_list)
         obj.attribute("name") = key.c_str();
+
+    m_data_node.parent().attribute("toplevelobject") = m_root_obj.attribute("name").as_string();
 }
 
 //////////////////// BEHAVIOUR
@@ -377,9 +387,8 @@ void BehaviourFile::loadFile(std::string_view path)
     m_loaded = false;
 
     // get essential nodes
-    m_root_obj  = m_data_node.find_child_by_attribute("class", "hkRootLevelContainer");
     m_graph_obj = m_data_node.find_child_by_attribute("class", "hkbBehaviorGraph");
-    if (!(m_root_obj && m_graph_obj && isRefBy(m_graph_obj.attribute("name").as_string(), m_root_obj)))
+    if (!(m_graph_obj && isRefBy(m_graph_obj.attribute("name").as_string(), m_root_obj)))
     {
         file_logger->error("Couldn't find behavior graph!");
         return;
