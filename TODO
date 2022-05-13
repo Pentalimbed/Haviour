@@ -27,14 +27,15 @@
 - 0.5a Refactor the shit out of the bloody widgets
 - 0.5a ListView/PropEdit edit all kinds of hkx file (which they're supposed to but were not due to my stupidity)
 - 0.5a Scalar/Reference edit's width set to fixed
-
 - 0.5.1a Loading files that does not stick to 4 digit object indexing
 - 0.5.1a Blending transition hotfix
 - 0.5.1a Transition array hotfix
 
 - 0.6a Editing character file (anim name & properties)
 - 0.6a CRC32 Macro
-- 0.6a char prop in behavior file can edit type now
+- 0.6a Char prop in behavior file can edit type now
+- 0.6.1a Dereference fix
+- 0.6.1a Picker listbox crash fix
 
 Delete all children
 Behaviour diagnosis

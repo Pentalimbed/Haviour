@@ -125,7 +125,7 @@ std::optional<T> filteredPickerListBox(const char*                              
     else if (ImGui::BeginListBox(label, {size.x, size.y * std::min(items.size(), max_item)}))
     {
         ImGuiListClipper clipper;
-        clipper.Begin(items.size());
+        clipper.Begin(items_filtered.size());
 
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
@@ -571,10 +571,12 @@ struct RefEdit : public StringEdit
         auto parent_obj = getParentObj(m_hkparam);
         assert(parent_obj);
         auto parent_id = parent_obj.attribute("name").as_string();
+
+        StringEdit::updateValue();
+
         if (!isRefBy(old_value, parent_obj))
             m_file->deRef(old_value, parent_id);
         m_file->addRef(m_value, parent_id);
-        StringEdit::updateValue();
     }
     DEF_EDIT_CONSTR(RefEdit, StringEdit)
 };
