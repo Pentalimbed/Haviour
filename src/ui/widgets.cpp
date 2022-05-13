@@ -10,8 +10,6 @@ namespace Haviour
 {
 namespace Ui
 {
-#define addTooltip(...) \
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip(__VA_ARGS__);
 
 bool iconButton(const char* label)
 {
@@ -346,7 +344,7 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::Behaviour
 bool ParamEdit::showButton()
 {
     varBindingButton(getName(), m_hkparam,
-                     m_file->getType() == Hkx::HkxFile::kBehaviour ? dynamic_cast<Hkx::BehaviourFile*>(m_file) : nullptr);
+                     (m_file && (m_file->getType() == Hkx::HkxFile::kBehaviour)) ? dynamic_cast<Hkx::BehaviourFile*>(m_file) : nullptr);
     return false;
 }
 
@@ -671,7 +669,11 @@ void objLiveEditList(
 
 ////////////////    Linked Prop Edits
 
-void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& file)
+void varEditPopup(const char*                           str_id,
+                  Hkx::Variable&                        var,
+                  Hkx::VariableManager&                 manager,
+                  std::function<pugi::xml_node(size_t)> get_ref_fn,
+                  Hkx::HkxFile&                         file)
 {
     if (ImGui::BeginPopup(str_id))
     {
@@ -682,7 +684,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& fi
             if (ImGui::Button(ICON_FA_TRASH))
             {
                 auto name     = var.get<Hkx::PropName>().text().as_string();
-                auto ref_node = file.getFirstVarRef(var.m_index);
+                auto ref_node = get_ref_fn(var.m_index);
                 if (ref_node)
                 {
                     spdlog::warn("This variable is still referenced by {} and potentially more object.\nID copied to clipboard.", ref_node.attribute("name").as_string());
@@ -690,7 +692,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& fi
                 }
                 else
                 {
-                    file.m_var_manager.delEntry(var.m_index);
+                    manager.delEntry(var.m_index);
                     spdlog::info("Variable {} deleted!", name);
                     ImGui::EndTable();
                     ImGui::CloseCurrentPopup();
@@ -705,7 +707,7 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& fi
             switch (var_type_enum)
             {
                 case Hkx::VARIABLE_TYPE_BOOL:
-                    BoolEdit(var_value_node, file)();
+                    BoolEdit{var_value_node}();
                     break;
                 case Hkx::VARIABLE_TYPE_INT8:
                     ScalarEdit<ImGuiDataType_S8>{var_value_node}();
@@ -721,19 +723,19 @@ void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& fi
                     break;
                 case Hkx::VARIABLE_TYPE_POINTER:
                     ImGui::TableNextColumn();
-                    if (ImGui::InputText("value", &file.m_var_manager.getPointerValue(var_value_node.text().as_uint())))
+                    if (ImGui::InputText("value", &manager.getPointerValue(var_value_node.text().as_uint())))
                         file.buildRefList(getParentObj(var.get<Hkx::PropWordValue>()).attribute("name").as_string());
                     ImGui::TableNextColumn();
                     break;
                 case Hkx::VARIABLE_TYPE_VECTOR3:
                     ImGui::TableNextColumn();
-                    ImGui::InputFloat3("value", file.m_var_manager.getQuadValue(var_value_node.text().as_uint()).data(), "%.6f");
+                    ImGui::InputFloat3("value", manager.getQuadValue(var_value_node.text().as_uint()).data(), "%.6f");
                     ImGui::TableNextColumn();
                     break;
                 case Hkx::VARIABLE_TYPE_VECTOR4:
                 case Hkx::VARIABLE_TYPE_QUATERNION:
                     ImGui::TableNextColumn();
-                    ImGui::InputFloat4("value", file.m_var_manager.getQuadValue(var_value_node.text().as_uint()).data(), "%.6f");
+                    ImGui::InputFloat4("value", manager.getQuadValue(var_value_node.text().as_uint()).data(), "%.6f");
                     ImGui::TableNextColumn();
                     break;
                 default:
@@ -819,6 +821,7 @@ void propEditPopup(const char* str_id, Hkx::CharacterProperty& prop, Hkx::Behavi
             }
             addTooltip("Delete\nIf it is still referenced, the property won't delete\nand one of its referencing object will be copied to clipboard.");
 
+            EnumEdit<Hkx::e_variableTypeEnum>(prop.get<Hkx::PropVarInfo>().getByName("type"))();
             auto role_node = prop.get<Hkx::PropVarInfo>().getByName("role").first_child();
             EnumEdit<Hkx::e_hkbRoleAttribute_Role>(role_node.getByName("role"))();
             FlagEdit<Hkx::f_hkbRoleAttribute_roleFlags>(role_node.getByName("flags"))();

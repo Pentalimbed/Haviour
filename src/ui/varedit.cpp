@@ -48,7 +48,18 @@ void VarEdit::show()
                     showEvtList();
                     ImGui::EndTable();
                 }
-            } // Charcter file here.
+            }
+            else if (file->getType() == Hkx::HkxFile::kCharacter)
+            {
+                if (ImGui::BeginTable("varlisttbl", 2))
+                {
+                    ImGui::TableNextColumn();
+                    showCharPropList();
+                    ImGui::TableNextColumn();
+                    showAnimList();
+                    ImGui::EndTable();
+                }
+            }
             else
                 ImGui::TextDisabled("Incompatible hkx type.");
         }
@@ -66,8 +77,7 @@ void VarEdit::showVarList()
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
 
     bool  scroll_to_bottom = false;
-    auto  file_manager     = Hkx::HkxFileManager::getSingleton();
-    auto& current_file     = *dynamic_cast<Hkx::BehaviourFile*>(file_manager->getCurrentFile());
+    auto& file             = *dynamic_cast<Hkx::BehaviourFile*>(Hkx::HkxFileManager::getSingleton()->getCurrentFile());
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Variables"), ImGui::SameLine();
@@ -81,18 +91,18 @@ void VarEdit::showVarList()
             {
                 ImGui::CloseCurrentPopup();
                 scroll_to_bottom = true;
-                current_file.m_var_manager.addEntry(Hkx::getVarTypeEnum(data_type));
+                file.m_var_manager.addEntry(Hkx::getVarTypeEnum(data_type));
                 break;
             }
         ImGui::EndPopup();
     }
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_FILTER))
-        current_file.cleanupVariables();
+        file.cleanupVariables();
     addTooltip("Remove unused variables (USE WITH CAUTION!)");
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_HASHTAG))
-        current_file.reindexVariables();
+        file.reindexVariables();
     addTooltip("Reindex variables\nDiscard all variables marked obsolete");
 
     ImGui::InputText("Filter", &m_var_filter), ImGui::SameLine();
@@ -116,13 +126,11 @@ void VarEdit::showVarList()
         ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableNextRow();
 
-        auto var_list = current_file.m_var_manager.getEntryList();
+        auto var_list = file.m_var_manager.getEntryList();
         std::erase_if(var_list,
                       [=](auto& var) {
                           auto var_disp_name = std::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string()); // :3
-                          return !(var.m_valid &&
-                                   (m_var_filter.empty() ||
-                                    !std::ranges::search(var_disp_name, m_var_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                          return !(var.m_valid && hasText(var_disp_name, m_var_filter));
                       });
 
         ImGuiListClipper clipper;
@@ -163,7 +171,8 @@ void VarEdit::showVarList()
                 if (is_selected)
                     ImGui::SetItemDefaultFocus();
             }
-        varEditPopup("Editing Varibale", m_var_current, current_file);
+        varEditPopup(
+            "Editing Varibale", m_var_current, file.m_var_manager, [&](size_t idx) { return file.getFirstVarRef(idx); }, file);
 
         if (scroll_to_bottom)
             ImGui::SetScrollHereY(1.0f);
@@ -216,9 +225,7 @@ void VarEdit::showEvtList()
         std::erase_if(evt_list,
                       [=](auto& evt) {
                           auto disp_name = std::format("{:3} {}", evt.m_index, evt.get<Hkx::PropName>().text().as_string()); // :3
-                          return !(evt.m_valid &&
-                                   (m_evt_filter.empty() ||
-                                    !std::ranges::search(disp_name, m_evt_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                          return !(evt.m_valid && hasText(disp_name, m_evt_filter));
                       });
 
         ImGuiListClipper clipper;
@@ -296,9 +303,7 @@ void VarEdit::showPropList()
             prop_list,
             [=](auto& prop) {
                 auto disp_name = std::format("{:3} {}", prop.m_index, prop.get<Hkx::PropName>().text().as_string()); // :3
-                return !(prop.m_valid &&
-                         (m_prop_filter.empty() ||
-                          !std::ranges::search(disp_name, m_prop_filter, [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }).empty()));
+                return !(prop.m_valid && hasText(disp_name, m_prop_filter));
             });
 
         ImGuiListClipper clipper;
@@ -329,6 +334,179 @@ void VarEdit::showPropList()
 
         ImGui::EndTable();
     }
+    ImGui::PopID();
+}
+
+void VarEdit::showCharPropList()
+{
+    ImGui::PushID("charpropedit");
+    constexpr auto table_flag =
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
+
+    bool  scroll_to_bottom = false;
+    auto& file             = *dynamic_cast<Hkx::CharacterFile*>(Hkx::HkxFileManager::getSingleton()->getCurrentFile());
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Character Properties"), ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+        ImGui::OpenPopup("Type Select");
+    addTooltip("Add new property");
+    if (ImGui::BeginPopup("Type Select"))
+    {
+        for (auto data_type : Hkx::e_variableType)
+            if ((data_type != "VARIABLE_TYPE_INVALID") && ImGui::Selectable(data_type.data()))
+            {
+                ImGui::CloseCurrentPopup();
+                scroll_to_bottom = true;
+                file.m_prop_manager.addEntry(Hkx::getVarTypeEnum(data_type));
+                break;
+            }
+        ImGui::EndPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_HASHTAG))
+        file.m_prop_manager.reindex();
+    addTooltip("Reindex properties\nDiscard all properties marked obsolete");
+
+    ImGui::InputText("Filter", &m_charprop_filter), ImGui::SameLine();
+    ImGui::Button(ICON_FA_QUESTION_CIRCLE);
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextColored(g_color_invalid, "Invalid");
+        ImGui::TextColored(g_color_bool, "Boolean");
+        ImGui::TextColored(g_color_int, "Int8/16/32");
+        ImGui::TextColored(g_color_float, "Real");
+        ImGui::TextColored(g_color_attr, "Pointer");
+        ImGui::TextColored(g_color_quad, "Vector/Quaternion");
+        ImGui::EndTooltip();
+    }
+    ImGui::Separator();
+
+    if (ImGui::BeginTable("##Charproplist", 2, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
+    {
+        ImGui::TableSetupColumn("id", ImGuiTableColumnFlags_WidthFixed, 36);
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableNextRow();
+
+        auto var_list = file.m_prop_manager.getEntryList();
+        std::erase_if(var_list,
+                      [=](auto& var) {
+                          auto disp_name = std::format("{:3} {}", var.m_index, var.get<Hkx::PropName>().text().as_string()); // :3
+                          return !(var.m_valid && hasText(disp_name, m_charprop_filter));
+                      });
+
+        ImGuiListClipper clipper;
+        clipper.Begin(var_list.size());
+        while (clipper.Step())
+            for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+            {
+                auto& var = var_list[row_n];
+
+                ImGui::TableNextColumn();
+
+                auto var_type      = var.get<Hkx::PropVarInfo>().getByName("type").text().as_string();
+                auto var_type_enum = Hkx::getVarTypeEnum(var_type);
+                if (var_type_enum < 0)
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_invalid);
+                else if (var_type_enum < 1)
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_bool);
+                else if (var_type_enum < 4)
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_int);
+                else if (var_type_enum < 5)
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_float);
+                else if (var_type_enum < 6)
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_attr);
+                else
+                    ImGui::PushStyleColor(ImGuiCol_Text, g_color_quad);
+                ImGui::Text("%d", var.m_index);
+                addTooltip(var_type);
+                ImGui::PopStyleColor();
+
+                ImGui::TableNextColumn();
+                const bool is_selected = false;
+                if (ImGui::Selectable(std::format("{}##{}", var.get<Hkx::PropName>().text().as_string(), var.m_index).c_str(), is_selected))
+                {
+                    m_charprop_current = var;
+                    ImGui::OpenPopup("Editing Varibale");
+                }
+                addTooltip("Click to edit");
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+        varEditPopup(
+            "Editing Charprop", m_charprop_current, file.m_prop_manager, [&](size_t) { return pugi::xml_node(); }, file);
+
+        if (scroll_to_bottom)
+            ImGui::SetScrollHereY(1.0f);
+
+        ImGui::EndTable();
+    }
+    ImGui::PopID();
+}
+
+void VarEdit::showAnimList()
+{
+    ImGui::PushID("animlist");
+    constexpr auto table_flag =
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+        ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_NoBordersInBody;
+
+    bool                        scroll_to_bottom = false;
+    auto&                       file             = *dynamic_cast<Hkx::CharacterFile*>(Hkx::HkxFileManager::getSingleton()->getCurrentFile());
+    auto                        anim_node        = file.getAnimNames();
+    std::vector<pugi::xml_node> anim_nodes       = {anim_node.children().begin(), anim_node.children().end()};
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Animation list"), ImGui::SameLine();
+    if (ImGui::Button(ICON_FA_PLUS_CIRCLE))
+    {
+        appendXmlString(anim_node, Hkx::g_def_hkStringPtr);
+        scroll_to_bottom = true;
+    }
+    addTooltip("Add new animation");
+
+    ImGui::InputText("Filter", &m_anim_filter);
+    ImGui::Separator();
+
+    pugi::xml_node mark_delete = {};
+    if (ImGui::BeginTable("##Animlist", 1, table_flag, ImVec2(-FLT_MIN, -FLT_MIN)))
+    {
+        std::erase_if(anim_nodes, [&](pugi::xml_node node) { return !hasText(node.text().as_string(), m_anim_filter); });
+
+        ImGuiListClipper clipper;
+        clipper.Begin(anim_nodes.size());
+        while (clipper.Step())
+            for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
+            {
+                ImGui::TableNextColumn();
+                ImGui::PushID(row_n);
+
+                std::string name = anim_nodes[row_n].text().as_string();
+                ImGui::SetNextItemWidth(-1);
+                if (ImGui::InputText("##name", &name, ImGuiInputTextFlags_EnterReturnsTrue))
+                {
+                    anim_nodes[row_n].text() = name.c_str();
+                    if (name.empty())
+                        mark_delete = anim_nodes[row_n];
+                }
+                addTooltip("Press Enter to apply\nRemove all characters to delete the animation entry");
+
+                ImGui::PopID();
+            }
+
+        if (scroll_to_bottom)
+            ImGui::SetScrollHereY(1.0f);
+
+        ImGui::EndTable();
+    }
+    if (mark_delete)
+    {
+        anim_node.remove_child(mark_delete);
+        anim_node.attribute("numelements") = anim_node.attribute("numelements").as_uint() - 1;
+    }
+
     ImGui::PopID();
 }
 } // namespace Ui

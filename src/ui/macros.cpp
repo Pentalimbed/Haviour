@@ -4,6 +4,8 @@
 #include "hkx/hkutils.h"
 #include "hkx/hkclass.inl"
 
+#include <filesystem>
+
 #include <imgui.h>
 #include <extern/imgui_stdlib.h>
 
@@ -19,7 +21,7 @@ void MacroModal::open(pugi::xml_node working_obj, Hkx::HkxFile* file)
 }
 void MacroModal::show()
 {
-    if (!m_working_obj || !m_file)
+    if (getClass() && (!m_working_obj || !m_file))
     {
         m_open = false;
         return;
@@ -126,6 +128,44 @@ void TriggerMacro::parse()
     }
 }
 
+//////////////////// CRC32
+
+void Crc32Macro::open(pugi::xml_node working_obj, Hkx::HkxFile* file)
+{
+    MacroModal::open(working_obj, file);
+    m_path = {};
+}
+
+void Crc32Macro::drawUi()
+{
+    ImGui::TextUnformatted(getHint());
+    ImGui::Separator();
+    if (ImGui::InputTextWithHint("Path", R"(meshes\actors\character\animations\1hm_attackright.hkx)", &m_path, ImGuiInputTextFlags_EnterReturnsTrue))
+    {
+        auto temp_path = m_path;
+
+        for (auto& ch : temp_path)
+            if (ch == '/') ch = '\\';
+        transform(temp_path.begin(), temp_path.end(), temp_path.begin(), ::tolower);
+
+        std::filesystem::path path(temp_path);
+        if (path.has_stem() && path.has_parent_path())
+        {
+            auto parent = path.parent_path().string();
+            auto stem   = path.stem().string();
+
+            m_out_crc = fmt::format("{}\n{}\n{}",
+                                    Crc32::update(parent.data(), parent.length()),
+                                    Crc32::update(stem.data(), stem.length()),
+                                    7891816);
+        }
+    }
+    addTooltip("Press Enter to convert");
+    ImGui::InputTextMultiline("Output", &m_out_crc, {}, ImGuiInputTextFlags_ReadOnly);
+}
+
+//////////////////// Macro manager
+
 MacroManager* MacroManager::getSingleton()
 {
     static MacroManager manager;
@@ -135,6 +175,8 @@ MacroManager* MacroManager::getSingleton()
 MacroManager::MacroManager()
 {
     m_macros.emplace_back(std::make_unique<TriggerMacro>());
+    m_macros.emplace_back(std::make_unique<Crc32Macro>());
+
     m_file_listener = Hkx::HkxFileManager::getSingleton()->appendListener(Hkx::kEventFileChanged, [=]() {
         for (auto& macro : m_macros)
         {

@@ -48,7 +48,22 @@ inline VariableTypeEnum getVarTypeEnum(std::string_view enumstr)
     return VARIABLE_TYPE_INVALID;
 }
 
+
 #define DEFENUM(name) constexpr auto name = std::to_array<EnumWrapper>
+
+DEFENUM(e_variableTypeEnum) // for prop edit
+({
+    {"VARIABLE_TYPE_INVALID"},
+    {"VARIABLE_TYPE_BOOL"},
+    {"VARIABLE_TYPE_INT8"},
+    {"VARIABLE_TYPE_INT16"},
+    {"VARIABLE_TYPE_INT32"},
+    {"VARIABLE_TYPE_REAL"},
+    {"VARIABLE_TYPE_POINTER"},
+    {"VARIABLE_TYPE_VECTOR3"},
+    {"VARIABLE_TYPE_VECTOR4"},
+    {"VARIABLE_TYPE_QUATERNION"},
+});
 
 // hkbVariableInfo -> hkbRoleAttribute
 DEFENUM(e_hkbRoleAttribute_Role)

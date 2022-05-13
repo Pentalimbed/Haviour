@@ -159,15 +159,13 @@ void PropEdit::show()
                     }
                     ImGui::SameLine();
                     if (ImGui::Button(ICON_FA_SCROLL))
-                    {
                         ImGui::OpenPopup("Macro Select");
-                    }
                     addTooltip("Macros");
                     if (ImGui::BeginPopup("Macro Select"))
                     {
                         bool has_something = false;
                         for (auto& macro : MacroManager::getSingleton()->getMacros())
-                            if (!strcmp(macro->getClass(), class_str))
+                            if (macro->getClass() && !strcmp(macro->getClass(), class_str))
                             {
                                 has_something = true;
                                 if (ImGui::Selectable(macro->getName()))

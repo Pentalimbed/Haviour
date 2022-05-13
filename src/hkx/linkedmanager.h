@@ -192,8 +192,7 @@ public:
     {
         auto retval = LinkedPropertyManager<CharacterProperty>::addEntry();
 
-        retval.get<PropVarInfo>().getByName("type").text()                                  = "VARIABLE_TYPE_POINTER";
-        retval.get<PropVarInfo>().getByName("role").first_child().getByName("flags").text() = "FLAG_OUTPUT|FLAG_HIDDEN|FLAG_NOT_VARIABLE|FLAG_NONE";
+        retval.get<PropVarInfo>().getByName("role").first_child().getByName("flags").text() = "FLAG_NOT_VARIABLE|FLAG_NONE";
 
         return retval;
     }

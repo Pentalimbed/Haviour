@@ -3,6 +3,7 @@
 #include <string>
 #include <tuple>
 #include <functional>
+#include <mutex>
 
 #include <robin_hood.h>
 #include <pugixml.hpp>
@@ -117,6 +118,79 @@ struct StringHash
 template <typename T>
 using StringMap = robin_hood::unordered_map<std::string, T, StringHash, std::equal_to<>>;
 using StringSet = robin_hood::unordered_set<std::string, StringHash, std::equal_to<>>;
+
+// crc32
+// source: https://gist.github.com/timepp/1f678e200d9e0f2a043a9ec6b3690635
+// actually it's nemesis
+inline uint32_t mirror_bit(uint32_t val, char num)
+{
+    uint32_t retval = 0;
+    for (int i = 1; i <= num; i++)
+    {
+        if (val & 1)
+            retval |= (1 << (num - i));
+        val >>= 1;
+    }
+    return retval;
+}
+
+struct Crc32
+{
+    static inline uint32_t table[256];
+
+    static inline void generate_table(uint32_t (&table)[256])
+    {
+        constexpr uint32_t polynomial = 0x04C11DB7; // pkzip
+        for (uint32_t i = 0; i < 256; i++)
+        {
+            // uint32_t c = i;
+            // for (size_t j = 0; j < 8; j++)
+            // {
+            //     if (c & 1)
+            //         c = polynomial ^ (c >> 1);
+            //     else
+            //         c >>= 1;
+            // }
+            // table[i] = c;
+            uint32_t c = mirror_bit(i, 8) << 24;
+            for (size_t j = 0; j < 8; j++)
+                c = (c << 1) ^ ((c & (1 << 31)) ? polynomial : 0);
+            c = mirror_bit(c, 32);
+
+            table[i] = c;
+        }
+    }
+
+    static inline uint32_t update(const char* buf, size_t len, uint32_t initial = 0, uint32_t finalxor = 0)
+    {
+        static std::once_flag flag;
+        std::call_once(flag, []() {
+            Crc32::generate_table(Crc32::table);
+        });
+
+        // uint32_t c = initial ^ 0xFFFFFFFF;
+        // const uint8_t* u = static_cast<const uint8_t*>(buf);
+        // for (size_t i = 0; i < len; ++i)
+        // {
+        // 	c = table[(c ^ u[i]) & 0xFF] ^ (c >> 8);
+        // }
+        // return c ^ 0xFFFFFFFF;
+
+        uint32_t c = initial;
+        while (len--)
+            c = (c >> 8) ^ table[(c & 0xFF) ^ *(buf++)];
+        return c ^ finalxor;
+    }
+};
+
+// quickly define factory member & method
+#define DEF_FACT_MEM(type, name, def_val) \
+    type  m_##name = def_val;             \
+    auto& name(type name)                 \
+    {                                     \
+        m_##name = name;                  \
+        return *this;                     \
+    }
 
 //////////////////////////    XML HELPERS
 inline pugi::xml_node appendXmlString(pugi::xml_node target, std::string_view srcString)

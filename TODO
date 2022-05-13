@@ -32,7 +32,12 @@
 - 0.5.1a Blending transition hotfix
 - 0.5.1a Transition array hotfix
 
+- 0.6a Editing character file (anim name & properties)
+- 0.6a CRC32 Macro
+- 0.6a char prop in behavior file can edit type now
+
+Delete all children
 Behaviour diagnosis
-Display names within the var/state/ref/evt edit when not editing (using combobox?)
-Editing character file (anim name & properties)
+Scrolling names for var/state/ref/evt edit
 Nested state id picker
+Maybe cleanup replicate varedit code?

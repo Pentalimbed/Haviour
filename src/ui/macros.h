@@ -19,7 +19,7 @@ public:
     friend class MacroManager;
 
     virtual constexpr const char* getName()  = 0;
-    virtual constexpr const char* getClass() = 0;
+    virtual constexpr const char* getClass() = 0; // nullptr = no objects / files, empty string = any objects
     virtual constexpr const char* getHint()  = 0;
     virtual void                  open(pugi::xml_node working_obj, Hkx::HkxFile* file);
     virtual void                  show();
@@ -53,6 +53,27 @@ private:
     std::string m_parse_text;
     bool        m_create_new_event = false;
     bool        m_replace          = false;
+
+    void parse();
+};
+
+class Crc32Macro : public MacroModal
+{
+public:
+    virtual void                  open(pugi::xml_node working_obj, Hkx::HkxFile* file) override;
+    virtual constexpr const char* getName() override { return "CRC32"; }
+    virtual constexpr const char* getClass() override { return nullptr; }
+    virtual constexpr const char* getHint() override
+    {
+        return "This macro will generate crc32 checksum for an animation path.\n"
+               "All capital letters with be converted to lower case, and all / to \\\n"
+               "Extension doesn't matter because this is only for hkx files.";
+    }
+    virtual void drawUi() override;
+
+private:
+    std::string m_path;
+    std::string m_out_crc;
 
     void parse();
 };

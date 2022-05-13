@@ -101,13 +101,28 @@ inline void fullTableSeparator()
 
 ///////////////////////// PICKERS
 
-// Listbox with clipping and custom item widget function
-// This function returns selected index if selected
-// item function should return true if selected
+// ListBox with clipping, filter, max size limit and custom item widget function
+// filter function returns true if item should remain
+// size specifies width & item height
 template <typename T>
-std::optional<int> pickerListBox(const char* label, ImVec2 size, std::vector<T>& items, std::function<bool(T&)> item_func)
+std::optional<T> filteredPickerListBox(const char*                               label,
+                                       std::vector<T>&                           items,
+                                       std::function<bool(T&, std::string_view)> filter_func,
+                                       std::function<bool(T&)>                   item_func,
+                                       ImVec2                                    size     = {400.0f, 21.0f},
+                                       size_t                                    max_item = 30)
 {
-    if (ImGui::BeginListBox(label, size))
+    static std::string filter_text = {};
+    ImGui::InputText("Filter", &filter_text);
+
+    std::vector<size_t> items_filtered = {};
+    for (auto& item : items)
+        if (filter_func(item, filter_text))
+            items_filtered.push_back(&item - items.data());
+
+    if (items_filtered.empty())
+        ImGui::TextDisabled("No item");
+    else if (ImGui::BeginListBox(label, {size.x, size.y * std::min(items.size(), max_item)}))
     {
         ImGuiListClipper clipper;
         clipper.Begin(items.size());
@@ -115,37 +130,14 @@ std::optional<int> pickerListBox(const char* label, ImVec2 size, std::vector<T>&
         while (clipper.Step())
             for (int row_n = clipper.DisplayStart; row_n < clipper.DisplayEnd; row_n++)
             {
-                if (item_func(items[row_n]))
+                if (item_func(items[items_filtered[row_n]]))
                 {
                     ImGui::EndListBox();
-                    return row_n;
+                    return items[items_filtered[row_n]];
                 }
             }
         ImGui::EndListBox();
     }
-    return std::nullopt;
-}
-
-// pickerListBox + filter
-// filter function returns true if item should remain
-template <typename T>
-std::optional<T> filteredPickerListBox(const char*                               label,
-                                       std::vector<T>&                           items,
-                                       std::function<bool(T&, std::string_view)> filter_func,
-                                       std::function<bool(T&)>                   item_func)
-{
-    static std::string filter_text = {};
-    ImGui::InputText("Filter", &filter_text);
-
-    std::vector<T> items_filtered = {};
-    for (auto& item : items)
-        if (filter_func(item, filter_text))
-            items_filtered.push_back(item);
-
-    if (items_filtered.empty())
-        ImGui::TextDisabled("No item");
-    else if (auto res = pickerListBox(label, {400.0f, 21.0f * std::min(items_filtered.size(), 30ull)}, items_filtered, item_func); res.has_value())
-        return items[res.value()];
     return std::nullopt;
 }
 
@@ -200,14 +192,14 @@ std::optional<T> pickerPopup(const char*                               str_id,
 template <typename Entry>
 bool linkedPropSelectable(Entry& prop)
 {
+    bool res = false;
     if constexpr (std::is_same_v<Entry, Hkx::Variable>)
         ImGui::PushStyleColor(ImGuiCol_Text, getVarColor(prop));
-    if (ImGui::Selectable(prop.getItemName().c_str()))
-    {
-        if constexpr (std::is_same_v<Entry, Hkx::Variable>)
-            ImGui::PopStyleColor();
-        return true;
-    }
+    auto idstr = fmt::format("{}", prop.m_index);
+    ImGui::TextUnformatted(idstr.c_str()), ImGui::SameLine();
+    ImGui::Dummy({std::max(0.0f, 35.0f - ImGui::CalcTextSize(idstr.c_str()).x), 0}), ImGui::SameLine();
+    if (ImGui::Selectable(prop.getName()))
+        res = true;
     if constexpr (std::is_same_v<Entry, Hkx::Variable>)
         ImGui::PopStyleColor();
     return false;
@@ -282,14 +274,6 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::Behaviour
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile* file);
 
 ////////////////    hkParam Edits
-
-#define DEF_FACT_MEM(type, name, def_val) \
-    type  m_##name = def_val;             \
-    auto& name(type name)                 \
-    {                                     \
-        m_##name = name;                  \
-        return *this;                     \
-    }
 
 #define DEF_EDIT_CONSTR(derived, base)     \
     derived() = default;                   \
@@ -631,7 +615,11 @@ void objLiveEditList(
 
 ////////////////    Linked Prop Edits
 
-void varEditPopup(const char* str_id, Hkx::Variable& var, Hkx::BehaviourFile& file);
+void varEditPopup(const char*                           str_id,
+                  Hkx::Variable&                        var,
+                  Hkx::VariableManager&                 manager,
+                  std::function<pugi::xml_node(size_t)> get_ref_fn,
+                  Hkx::HkxFile&                         file);
 void evtEditPopup(const char* str_id, Hkx::AnimationEvent& evt, Hkx::BehaviourFile& file);
 void propEditPopup(const char* str_id, Hkx::CharacterProperty& evt, Hkx::BehaviourFile& file);
 

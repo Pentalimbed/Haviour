@@ -282,6 +282,20 @@ void showMenuBar()
                 file_manager->getCurrentFile()->buildRefList();
             if (ImGui::MenuItem("Reindex Objects", nullptr, false, file_manager->isCurrentFileReady()))
                 file_manager->getCurrentFile()->reindexObj();
+
+            ImGui::Separator();
+
+            for (auto& macro : MacroManager::getSingleton()->getMacros())
+                if (!macro->getClass())
+                {
+                    if (ImGui::MenuItem(macro->getName()))
+                    {
+                        ImGui::CloseCurrentPopup();
+                        macro->open({}, nullptr);
+                    }
+                    addTooltip(macro->getHint());
+                }
+
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Window"))
