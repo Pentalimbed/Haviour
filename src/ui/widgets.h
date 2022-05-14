@@ -367,7 +367,7 @@ struct ScalarEdit : public ParamEdit
     virtual bool showEdit() override
     {
         constexpr auto format = (data_type == ImGuiDataType_Float) ? "%.6f" : nullptr;
-        ImGui::SetNextItemWidth(120);
+        // ImGui::SetNextItemWidth(120);
         return ImGui::InputScalar(getName(), data_type, &m_value, nullptr, nullptr, format);
     }
     DEF_EDIT_CONSTR(ScalarEdit, ParamEdit)

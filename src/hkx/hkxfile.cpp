@@ -93,7 +93,7 @@ void HkxFile::saveFile(std::string_view path)
 
     file_logger->info("Saving file...");
 
-    if (!m_doc.save_file(path.data(), " ", pugi::format_default | pugi::format_no_escapes))
+    if (!m_doc.save_file(path.data(), "    ", pugi::format_default | pugi::format_no_escapes))
         file_logger->warn("Failed to save file!");
 }
 

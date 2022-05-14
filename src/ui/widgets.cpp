@@ -488,7 +488,8 @@ bool refEdit(std::string&                         value,
         file.addRef(value, parent_id);
         // for states
         if (auto obj = file.getObj(value); !strcmp(obj.attribute("class").as_string(), "hkbStateMachineStateInfo"))
-            obj.getByName("stateId").text() = getBiggestStateId(getParentStateMachine(obj, file), file) + 1;
+            if (auto state_machine = getParentStateMachine(obj, file); state_machine.getByName("states").attribute("numelements").as_uint() > 1)
+                obj.getByName("stateId").text() = getBiggestStateId(state_machine, file) + 1;
     }
 
     ImGui::PopID();

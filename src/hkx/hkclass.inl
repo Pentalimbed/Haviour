@@ -625,7 +625,7 @@ constexpr const char* g_def_hkbManualSelectorGenerator =
 constexpr const char* g_def_hkbModifierGenerator =
     R"(<hkobject name="#0000" class="hkbModifierGenerator" signature="0x1f81fae6">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">ModifierGenerator</hkparam>
     <hkparam name="modifier">null</hkparam>
     <hkparam name="generator">null</hkparam>

@@ -40,9 +40,13 @@
 - 0.6.2a Trigger array same event fix
 - 0.6.2a Object reindex top level object fix
 - 0.6.2a Release build macro window fix
+- 0.6.3a First state id assignment fix
+- 0.6.3a State machine selfTransitionMode ui fix
+- 0.6.3a Reverted widget width change
 
 Delete all children
 Behaviour diagnosis
 Scrolling names for var/state/ref/evt edit
 Nested state id picker
 Maybe cleanup replicate varedit code?
+userData fix

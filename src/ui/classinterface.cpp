@@ -469,7 +469,7 @@ UICLASS(hkbStateMachine)
                                              "If a transition is triggered when there are already m_maxSimultaneousTransitions active transitions,\n"
                                              "then the oldest transition will be immediately ended to make room for a new one.")();
                 EnumEdit<Hkx::e_hkbStateMachine_StateMachineSelfTransitionMode>(obj.getByName("selfTransitionMode"), file,
-                                                                                "How to deal with self-transitions (when the state machine is transitioned to while still active)().");
+                                                                                "How to deal with self-transitions (when the state machine is transitioned to while still active)().")();
 
                 ImGui::EndTable();
             }
