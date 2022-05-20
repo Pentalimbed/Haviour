@@ -191,7 +191,7 @@ void mainLoop()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
         /* MAIN THING HERE */
         Ui::showMainWindow();
         /* MAIN THING HERE */

@@ -534,7 +534,7 @@ constexpr const char* g_def_hkbBlenderGeneratorChild =
 constexpr const char* g_def_BSBoneSwitchGenerator =
     R"(<hkobject name="#0602" class="BSBoneSwitchGenerator" signature="0xf33d3eea">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">BoneSwitch</hkparam>
     <hkparam name="pDefaultGenerator">null</hkparam>
     <hkparam name="ChildrenA" numelements="0"></hkparam>
@@ -692,7 +692,7 @@ constexpr const char* g_def_BSCyclicBlendTransitionGenerator =
 constexpr const char* g_def_BSiStateTaggingGenerator =
     R"(<hkobject name="#0000" class="BSiStateTaggingGenerator" signature="0xf0826fc1">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">iStateGen</hkparam>
     <hkparam name="pDefaultGenerator">null</hkparam>
     <hkparam name="iStateToSetAs">0</hkparam>
@@ -714,7 +714,7 @@ constexpr const char* g_def_BSOffsetAnimationGenerator =
 constexpr const char* g_def_hkbModifierList =
     R"(<hkobject name="#0000" class="hkbModifierList" signature="0xa4180ca1">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">ModifierList</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="modifiers" numelements="0"></hkparam>
@@ -736,7 +736,7 @@ constexpr const char* g_def_hkbExpressionDataArray =
 constexpr const char* g_def_hkbEvaluateExpressionModifier =
     R"(<hkobject name="#0000" class="hkbEvaluateExpressionModifier" signature="0xf900f6be">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">2</hkparam>
     <hkparam name="name">ExpressionModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="expressions">null</hkparam>
@@ -745,7 +745,7 @@ constexpr const char* g_def_hkbEvaluateExpressionModifier =
 constexpr const char* g_def_hkbEventDrivenModifier =
     R"(<hkobject name="#0000" class="hkbEventDrivenModifier" signature="0x7ed3f44e">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">EventDrivenModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="modifier">null</hkparam>
@@ -937,7 +937,7 @@ constexpr const char* g_def_hkbFootIkControlsModifier_Leg =
 constexpr const char* g_def_hkbTwistModifier =
     R"(<hkobject name="#0000" class="hkbTwistModifier" signature="0xb6b76b32">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">TwistModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="axisOfRotation">(1.000000 0.000000 0.000000 0.000000)</hkparam>
@@ -952,7 +952,7 @@ constexpr const char* g_def_hkbTwistModifier =
 constexpr const char* g_def_BSDirectAtModifier =
     R"(<hkobject name="#0000" class="BSDirectAtModifier" signature="0x19a005c0">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">2</hkparam>
     <hkparam name="name">BSDirectAtModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="directAtTarget">true</hkparam>
@@ -1143,7 +1143,7 @@ constexpr const char* g_def_hkbDelayedModifier =
 constexpr const char* g_def_hkbDetectCloseToGroundModifier =
     R"(<hkobject name="#0000" class="hkbDetectCloseToGroundModifier" signature="0x981687b2">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">1</hkparam>
     <hkparam name="name">DetectCloseToGroundModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="closeToGroundEvent">
@@ -1330,7 +1330,7 @@ constexpr const char* g_def_BSInterpValueModifier =
 constexpr const char* g_def_BSIsActiveModifier =
     R"(<hkobject name="#0000" class="BSIsActiveModifier" signature="0xb0fde45a">
     <hkparam name="variableBindingSet">null</hkparam>
-    <hkparam name="userData">0</hkparam>
+    <hkparam name="userData">2</hkparam>
     <hkparam name="name">ActiveModifier</hkparam>
     <hkparam name="enable">true</hkparam>
     <hkparam name="bIsActive0">false</hkparam>

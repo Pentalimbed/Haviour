@@ -33,6 +33,12 @@ private:
     StringMap<ImColor> m_class_color_map;
 
     std::string m_nav_edit_str;
+
+    float m_col_width   = 200.0f;
+    float m_item_height = 27.0f;
+    bool  m_align_child = true;
+
+    void showColumns();
 };
 } // namespace Ui
 } // namespace Haviour

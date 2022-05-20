@@ -122,7 +122,7 @@ std::optional<T> filteredPickerListBox(const char*                              
 
     if (items_filtered.empty())
         ImGui::TextDisabled("No item");
-    else if (ImGui::BeginListBox(label, {size.x, size.y * std::min(items.size(), max_item)}))
+    else if (ImGui::BeginListBox(label, {size.x, size.y * std::min(items_filtered.size(), max_item)}))
     {
         ImGuiListClipper clipper;
         clipper.Begin(items_filtered.size());

@@ -44,9 +44,14 @@
 - 0.6.3a State machine selfTransitionMode ui fix
 - 0.6.3a Reverted widget width change
 
+- 0.7a userData default value fix
+- 0.7a Multiselect with shift key
+- 0.7a Aligning column view item with children
+
 Delete all children
 Behaviour diagnosis
 Scrolling names for var/state/ref/evt edit
 Nested state id picker
 Maybe cleanup replicate varedit code?
-userData fix
+Expand all children
+Configure what class to be shown in column view
