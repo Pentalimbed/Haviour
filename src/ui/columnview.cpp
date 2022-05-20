@@ -208,9 +208,11 @@ void ColumnView::showColumns()
                             auto        obj_class   = obj.attribute("class").as_string();
                             bool        is_selected = column.m_selected.contains(item.id);
                             bool        is_editing  = PropEdit::getSingleton()->getEditObj() == item.id;
-                            std::string disp_name   = std::format("{}##{}", obj.getByName("name").text().as_string(), obj.attribute("name").as_string());
+                            std::string disp_name   = obj.getByName("name").text().as_string();
+                            if (disp_name.empty())
+                                disp_name = obj.attribute("name").as_string();
 
-                            ImGui::PushID(disp_name.c_str());
+                            ImGui::PushID(item_idx);
 
                             ImGui::TableNextColumn();
                             if (is_editing)
