@@ -48,10 +48,18 @@
 - 0.7a Multiselect with shift key
 - 0.7a Aligning column view item with children
 
+- 0.7.1a Disable binding button for unbindable classes
+- 0.7.1a Unbound variable binding button icon change
+- 0.7.1a hkbFootIkControlsModifier ungroundedEvent fix
+
 Delete all children
+Expand all children
 Behaviour diagnosis
+Avoid showing duplicate object?
 Scrolling names for var/state/ref/evt edit
 Nested state id picker
-Maybe cleanup replicate varedit code?
-Expand all children
+Maybe cleanup duplicate varedit code?
 Configure what class to be shown in column view
+(Un)pack hkx
+32/64bit conversion
+Finish remaining classes

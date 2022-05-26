@@ -270,7 +270,6 @@ bool flagEditButton(const char* str_id, uint32_t& value)
     return res;
 }
 
-void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file);
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile* file);
 
 ////////////////    hkParam Edits

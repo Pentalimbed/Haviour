@@ -5,7 +5,7 @@ set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CAC
 set(VCPKG_TARGET_TRIPLET "x64-windows-static-md" CACHE STRING "")
 
 project(Haviour
-VERSION 1.0.0
+VERSION 0.7.1
 LANGUAGES CXX)
 
 find_package(spdlog CONFIG REQUIRED)

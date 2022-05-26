@@ -109,120 +109,6 @@ std::optional<std::string_view> animPickerPopup(const char* str_id, Hkx::Charact
     return std::nullopt;
 }
 
-void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile& file)
-{
-    static pugi::xml_node param_cache;
-    static pugi::xml_node bindings     = {};
-    static std::string    param_path   = {};
-    static pugi::xml_node prev_binding = {};
-
-    auto binding_set = getParentObj(hkparam).getByName("variableBindingSet");
-
-    ImGui::PushID(str_id);
-    if (ImGui::Button(ICON_FA_LINK))
-    {
-        bindings   = file.getObj(binding_set.text().as_string()).getByName("bindings");
-        param_path = getParamPath(hkparam);
-        // auto prev_bindings = bindings.select_nodes(fmt::format("/hkparam/hkobject/hkparam[@name='memberPath' and text()='{}']", param_path).c_str()); // fuck xpath
-        prev_binding = bindings.find_node([](auto node) { return !strcmp(node.attribute("name").as_string(), "memberPath") && (param_path == node.text().as_string()); }).parent();
-        ImGui::OpenPopup("bindmenu");
-    }
-    addTooltip("Edit binding");
-    ImGui::PopID();
-
-    bool open_var  = false;
-    bool open_prop = false;
-    if (ImGui::BeginPopup("bindmenu", ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        if (binding_set)
-        {
-            if (prev_binding)
-            {
-                std::string var_name;
-                auto        varidx = prev_binding.getByName("variableIndex").text().as_string();
-                if (!strcmp(prev_binding.getByName("bindingType").text().as_string(), "BINDING_TYPE_VARIABLE"))
-                    var_name = file.m_var_manager.getEntry(prev_binding.getByName("variableIndex").text().as_int()).getName();
-                else
-                    var_name = file.m_prop_manager.getEntry(prev_binding.getByName("variableIndex").text().as_int()).getName();
-                ImGui::TextUnformatted(ICON_FA_LINK);
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Bound with:");
-                ImGui::TextUnformatted(var_name.c_str());
-
-                if (ImGui::BeginTable("bit", 2, ImGuiTableFlags_SizingStretchProp))
-                {
-                    ScalarEdit<ImGuiDataType_S8>(prev_binding.getByName("bitIndex"), nullptr,
-                                                 "The index of the bit to which the variable is bound.\n"
-                                                 "A value of -1 indicates that we are not binding to an individual bit.")();
-                    ImGui::EndTable();
-                }
-            }
-            else
-                ImGui::TextDisabled("Not bound with any variable.");
-
-            ImGui::Separator();
-
-            if (ImGui::Selectable("Bind Varaibale"))
-                open_var = true;
-            if (ImGui::Selectable("Bind Character Property"))
-                open_prop = true;
-        }
-        else
-        {
-            ImGui::TextDisabled("This object is unbindable.");
-        }
-
-        ImGui::EndPopup();
-    }
-
-    if (binding_set)
-    {
-        bool set_focus = false;
-        if (open_var)
-        {
-            set_focus = true;
-            ImGui::OpenPopup("bindvar");
-        }
-        if (open_prop)
-        {
-            set_focus = true;
-            ImGui::OpenPopup("bindprop");
-        }
-
-        auto var  = linkedPropPickerPopup("bindvar", file.m_var_manager, set_focus);
-        auto prop = linkedPropPickerPopup("bindprop", file.m_prop_manager, set_focus);
-
-        if (var.has_value() || prop.has_value())
-        {
-            auto parent = getParentObj(hkparam);
-            if (!bindings)
-            {
-                auto bindings_id = file.addObj("hkbVariableBindingSet");
-                file.addRef(bindings_id, parent.attribute("name").as_string());
-                binding_set.text() = bindings_id.data();
-                bindings           = file.getObj(bindings_id).getByName("bindings");
-            }
-            if (!prev_binding)
-            {
-                prev_binding                                = appendXmlString(bindings, Hkx::g_def_hkbVariableBindingSet_Binding);
-                prev_binding.getByName("memberPath").text() = param_path.c_str();
-            }
-            if (var.has_value())
-            {
-                prev_binding.getByName("variableIndex").text() = var.value().m_index;
-                prev_binding.getByName("bindingType").text()   = "BINDING_TYPE_VARIABLE";
-            }
-            else
-            {
-                prev_binding.getByName("variableIndex").text() = prop.value().m_index;
-                prev_binding.getByName("bindingType").text()   = "BINDING_TYPE_CHARACTER_PROPERTY";
-            }
-            if ((param_path == "enable") && std::string_view(parent.attribute("class").as_string()).contains("Modifier"))
-                bindings.parent().getByName("indexOfBindingToEnable").text() = getChildIndex(prev_binding);
-        }
-    }
-}
-
 void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::BehaviourFile* file)
 {
     static pugi::xml_node param_cache;
@@ -230,20 +116,38 @@ void varBindingButton(const char* str_id, pugi::xml_node hkparam, Hkx::Behaviour
     static std::string    param_path   = {};
     static pugi::xml_node prev_binding = {};
 
-    auto binding_set = getParentObj(hkparam).getByName("variableBindingSet");
+    auto           binding_set       = getParentObj(hkparam).getByName("variableBindingSet");
+    pugi::xml_node temp_bindings     = {};
+    std::string    temp_param_path   = {};
+    pugi::xml_node temp_prev_binding = {};
+    bool           has_binding       = false;
+    if (file && binding_set)
+    {
+        temp_bindings = file->getObj(binding_set.text().as_string()).getByName("bindings");
+        if (temp_bindings)
+        {
+            temp_param_path   = getParamPath(hkparam);
+            temp_prev_binding = temp_bindings.find_node([&](auto node) { return !strcmp(node.attribute("name").as_string(), "memberPath") &&
+                                                                             (temp_param_path == node.text().as_string()); }).parent();
+        }
+    }
 
     ImGui::PushID(str_id);
-    if (ImGui::Button(ICON_FA_LINK))
+    if (!binding_set)
+        ImGui::BeginDisabled();
+    if (ImGui::Button(temp_prev_binding ? ICON_FA_LINK : ICON_FA_UNLINK))
     {
         if (file && binding_set)
         {
-            bindings     = file->getObj(binding_set.text().as_string()).getByName("bindings");
-            param_path   = getParamPath(hkparam);
-            prev_binding = bindings.find_node([](auto node) { return !strcmp(node.attribute("name").as_string(), "memberPath") && (param_path == node.text().as_string()); }).parent();
+            bindings     = temp_bindings;
+            param_path   = temp_param_path;
+            prev_binding = temp_prev_binding;
         }
         ImGui::OpenPopup("bindmenu");
     }
     addTooltip("Edit binding");
+    if (!binding_set)
+        ImGui::EndDisabled();
 
     bool open_var  = false;
     bool open_prop = false;

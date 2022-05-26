@@ -158,6 +158,7 @@ void ColumnView::showColumns()
             // remove excessive columns
             if (m_columns.size() > items.size())
                 m_columns.resize(items.size());
+
             if (m_align_child)
             {
                 // DP
@@ -250,8 +251,9 @@ void ColumnView::showColumns()
                             addTooltip(item.id.c_str());
                         }
                     }
-                    while (ImGui::TableGetRowIndex() + 1 < max_pos)
-                        ImGui::TableNextRow(0, m_item_height);
+                    if (m_align_child)
+                        while (ImGui::TableGetRowIndex() + 1 < max_pos)
+                            ImGui::TableNextRow(0, m_item_height);
 
                     ImGui::EndTable();
                 }

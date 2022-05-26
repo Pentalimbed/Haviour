@@ -1910,7 +1910,7 @@ UICLASS(hkbFootIkControlsModifier)
                 ImGui::BulletText("ungroundedEvent");
                 addTooltip("This event is sent if the foot raycast does not find a hit when the foot is supposed to be planted.");
                 ImGui::TableNextRow();
-                show_hkbEvent(obj.getByName("ungroundedEvent").first_child(), file);
+                show_hkbEvent(edit_leg.getByName("ungroundedEvent").first_child(), file);
 
                 ImGui::EndTable();
             }
