@@ -191,10 +191,18 @@ void mainLoop()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
-        /* MAIN THING HERE */
-        Ui::showMainWindow();
-        /* MAIN THING HERE */
+        // ImGui::ShowDemoWindow();
+        try
+        {
+            /* MAIN THING HERE */
+            Ui::showMainWindow();
+            /* MAIN THING HERE */
+        }
+        catch (std::exception e)
+        {
+            spdlog::critical("Critical Error:\n\t{}", e.what());
+            throw e;
+        }
 
         // notify
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.f);

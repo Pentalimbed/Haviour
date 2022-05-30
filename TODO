@@ -1,59 +1,76 @@
-- 0.1a Rework state and state selection
-- 0.1a Automate variable binding process
-- 0.1a Copy/paste ref management
-- 0.1a Disable unavailable classes options
-- 0.1a Display all available classes options in list view
-- 0.1a New file
+# 0.1a
+- Rework state and state selection
+- Automate variable binding process
+- Copy/paste ref management
+- Disable unavailable classes options
+- Display all available classes options in list view
+- New file
 
-- 0.2a Class hint
-- 0.2a Reindex objects
-- 0.2a Navigate to specific object in column view
-- 0.2a Automatic state id distribution
-- 0.2a Opitimize buildRefList
+# 0.2a
+- Class hint
+- Reindex objects
+- Navigate to specific object in column view
+- Automatic state id distribution
+- Opitimize buildRefList
 
-- 0.3a Loading skeleton file
-- 0.3a Bone select button
-- 0.3a Bone weight/index array
-- 0.3a Edit pointer variable
-- 0.3a BlenderGen fix
-- 0.3a Set keyboard focus when invoking var/evt select popup
+# 0.3a
+- Loading skeleton file
+- Bone select button
+- Bone weight/index array
+- Edit pointer variable
+- BlenderGen fix
+- Set keyboard focus when invoking var/evt select popup
 
-- 0.4a Animation select button
-- 0.4a Loading character file
-- 0.4a Ref list update with pointer variables
-- 0.4a Macros
-- 0.4a Parse trigger macro
+# 0.4a
+- Animation select button
+- Loading character file
+- Ref list update with pointer variables
+- Macros
+- Parse trigger macro
 
-- 0.5a Refactor the shit out of the bloody widgets
-- 0.5a ListView/PropEdit edit all kinds of hkx file (which they're supposed to but were not due to my stupidity)
-- 0.5a Scalar/Reference edit's width set to fixed
-- 0.5.1a Loading files that does not stick to 4 digit object indexing
-- 0.5.1a Blending transition hotfix
-- 0.5.1a Transition array hotfix
+# 0.5a
+- Refactor the shit out of the bloody widgets
+- ListView/PropEdit edit all kinds of hkx file (which they're supposed to but were not due to my stupidity)
+- Scalar/Reference edit's width set to fixed
+## 0.5.1a
+- Loading files that does not stick to 4 digit object indexing
+- Blending transition hotfix
+- Transition array hotfix
 
-- 0.6a Editing character file (anim name & properties)
-- 0.6a CRC32 Macro
-- 0.6a Char prop in behavior file can edit type now
-- 0.6.1a Dereference fix
-- 0.6.1a Picker listbox crash fix
-- 0.6.1a Sync clip gen ui fix
-- 0.6.2a Trigger array same event fix
-- 0.6.2a Object reindex top level object fix
-- 0.6.2a Release build macro window fix
-- 0.6.3a First state id assignment fix
-- 0.6.3a State machine selfTransitionMode ui fix
-- 0.6.3a Reverted widget width change
+# 0.6a
+- Editing character file (anim name & properties)
+- CRC32 Macro
+- Char prop in behavior file can edit type now
+## 0.6.1a
+- Dereference fix
+- Picker listbox crash fix
+- Sync clip gen ui fix
+## 0.6.2a
+- Trigger array same event fix
+- Object reindex top level object fix
+- Release build macro window fix
+## 0.6.3a
+- First state id assignment fix
+- State machine selfTransitionMode ui fix
+- Reverted widget width change
 
-- 0.7a userData default value fix
-- 0.7a Multiselect with shift key
-- 0.7a Aligning column view item with children
+# 0.7a
+- userData default value fix
+- Multiselect with shift key
+- Aligning column view item with children
+## 0.7.1a
+- Disable binding button for unbindable classes
+- Unbound variable binding button icon change
+- hkbFootIkControlsModifier ungroundedEvent fix
+## 0.7.2a
+### New
+- Unhandled exception crash log
+- Pressing Ctrl in column view expands all children
+### Bugfix
+- #IND crash fix
 
-- 0.7.1a Disable binding button for unbindable classes
-- 0.7.1a Unbound variable binding button icon change
-- 0.7.1a hkbFootIkControlsModifier ungroundedEvent fix
-
+Column view optimization
 Delete all children
-Expand all children
 Behaviour diagnosis
 Avoid showing duplicate object?
 Scrolling names for var/state/ref/evt edit
@@ -63,3 +80,4 @@ Configure what class to be shown in column view
 (Un)pack hkx
 32/64bit conversion
 Finish remaining classes
+Use regex for id matching

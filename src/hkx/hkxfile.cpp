@@ -160,7 +160,9 @@ void HkxFile::buildRefList(std::string_view id)
                 size_t      pos  = text.find('#');
                 while (pos != text.npos)
                 {
-                    if (!pos || (text[pos - 1] != '&')) // in case html entity, fuck html entities
+                    if ((!pos || (text[pos - 1] != '&')) && // in case html entity, fuck html entities
+                        (pos + 1 < text.size()) &&
+                        ((text[pos + 1] >= '0') && (text[pos + 1] <= '9'))) // #IND #INF etc.
                         m_refs->emplace(&text[pos], 5);
                     pos = text.find('#', pos + 1);
                 }
@@ -349,10 +351,13 @@ void HkxFile::reindexObjInternal(uint16_t start_id)
                 size_t      pos  = text.find('#');
                 while (pos != text.npos)
                 {
-                    if (!pos || (text[pos - 1] != '&')) // in case html entity, fuck html entities
+                    if ((!pos || (text[pos - 1] != '&')) && // in case html entity, fuck html entities
+                        (pos + 1 < text.size()) &&
+                        ((text[pos + 1] >= '0') && (text[pos + 1] <= '9'))) // #IND #INF etc
                     {
                         auto next_break = pos + 1;
-                        while ((next_break != text.size()) && (text[next_break] >= '0') && (text[next_break] <= '9')) ++next_break;
+                        while ((next_break != text.size()) && (text[next_break] >= '0') && (text[next_break] <= '9'))
+                            ++next_break;
                         auto rep_len = next_break - pos;
                         text.replace(pos, rep_len, m_remap->at(std::string(&text[pos], rep_len)));
                         pos = next_break;

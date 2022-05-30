@@ -231,10 +231,14 @@ void ColumnView::showColumns()
                             {
                                 if (is_selected)
                                     column.m_selected.erase(item.id);
-                                else if (ImGui::IsKeyDown(ImGuiKey_ModShift)) // Multiselect
-                                    column.m_selected.emplace(item.id);
                                 else
-                                    column.m_selected = {item.id};
+                                {
+                                    if (!ImGui::IsKeyDown(ImGuiKey_ModShift)) // single select
+                                        column.m_selected.clear();
+                                    column.m_selected.emplace(item.id);
+                                    if (ImGui::IsKeyDown(ImGuiKey_ModCtrl)) // expand children
+                                        expandChildren(item.id, col_idx);
+                                }
                             }
                             addTooltip(disp_name.c_str());
                             if (m_class_color_map.contains(obj_class))
@@ -251,15 +255,47 @@ void ColumnView::showColumns()
                             addTooltip(item.id.c_str());
                         }
                     }
-                    if (m_align_child)
-                        while (ImGui::TableGetRowIndex() + 1 < max_pos)
-                            ImGui::TableNextRow(0, m_item_height);
+                    // if (m_align_child)
+                    //     while (ImGui::TableGetRowIndex() + 1 < max_pos)
+                    //         ImGui::TableNextRow(0, m_item_height);
 
                     ImGui::EndTable();
                 }
                 ImGui::SameLine();
             }
         }
+    }
+}
+
+void ColumnView::expandChildren(std::string_view obj, size_t col)
+{
+    if (col >= m_columns.size())
+    {
+        spdlog::warn("Trying to expand {0} in column {1} but column {1} doesn't exist!", obj, col);
+        return;
+    }
+
+    auto  file_manager = Hkx::HkxFileManager::getSingleton();
+    auto& file         = *dynamic_cast<Hkx::BehaviourFile*>(file_manager->getCurrentFile());
+
+    StringSet                                  visited    = {};
+    std::deque<std::pair<std::string, size_t>> need_check = {{obj.data(), col}};
+    while (!need_check.empty())
+    {
+        auto& curr_pair = need_check.front();
+        if (curr_pair.second >= m_columns.size())
+            m_columns.push_back({});
+
+        visited.insert(curr_pair.first);
+        m_columns[curr_pair.second].m_selected.insert(curr_pair.first);
+
+        std::vector<std::string> children;
+        file.getRefedObjs(curr_pair.first, children);
+        for (auto& child : children)
+            if (!visited.contains(child))
+                need_check.push_back({child, curr_pair.second + 1});
+
+        need_check.pop_front();
     }
 }
 

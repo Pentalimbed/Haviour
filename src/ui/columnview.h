@@ -39,6 +39,8 @@ private:
     bool  m_align_child = true;
 
     void showColumns();
+
+    void expandChildren(std::string_view obj, size_t col);
 };
 } // namespace Ui
 } // namespace Haviour
