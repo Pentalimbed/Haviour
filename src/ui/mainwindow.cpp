@@ -301,7 +301,7 @@ void showMenuBar()
         if (ImGui::BeginMenu("Window"))
         {
             ImGui::MenuItem("Property Editor", nullptr, &PropEdit::getSingleton()->m_show);
-            ImGui::MenuItem("Variable/Event List", nullptr, &VarEdit::getSingleton()->m_show);
+            ImGui::MenuItem("Global List", nullptr, &VarEdit::getSingleton()->m_show);
             ImGui::Separator();
             ImGui::MenuItem("List View", nullptr, &ListView::getSingleton()->m_show);
             ImGui::MenuItem("Column View", nullptr, &ColumnView::getSingleton()->m_show);

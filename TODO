@@ -68,6 +68,14 @@
 - Pressing Ctrl in column view expands all children
 ### Bugfix
 - #IND crash fix
+## 0.7.3a
+### Change
+- Prop editor id field auto set to current one when switching objects
+- Variable list window renamed to global list
+- Logging file path when switching file
+### Bugfix
+- No opened file close file crash fix
+- Character file character property uneditable bug fix
 
 Column view optimization
 Delete all children
@@ -78,6 +86,5 @@ Nested state id picker
 Maybe cleanup duplicate varedit code?
 Configure what class to be shown in column view
 (Un)pack hkx
-32/64bit conversion
 Finish remaining classes
 Use regex for id matching

@@ -695,6 +695,39 @@ HkxFileManager* HkxFileManager::getSingleton()
     return std::addressof(manager);
 }
 
+void HkxFileManager::setCurrentFile(int idx)
+{
+    m_current_file = &m_files[idx];
+    spdlog::info("Switching file: {}", m_current_file->getPath());
+    dispatch(kEventFileChanged);
+}
+
+void HkxFileManager::setCurrentFile(HkxFile::HkxFileType type)
+{
+    switch (type)
+    {
+        case HkxFile::kBehaviour:
+            if (m_files.empty())
+                m_current_file = nullptr;
+            else
+                setCurrentFile(0);
+            break;
+        case HkxFile::kSkeleton:
+            m_current_file = &m_skel_file;
+            break;
+        case HkxFile::kCharacter:
+            m_current_file = &m_char_file;
+            break;
+        default: break;
+    }
+    if (type != HkxFile::kUnknown)
+    {
+        if (m_current_file)
+            spdlog::info("Switching file: {}", m_current_file->getPath());
+        dispatch(kEventFileChanged);
+    }
+}
+
 void HkxFileManager::loadFile(std::string_view path)
 {
     spdlog::info("Loading file: {}", path);

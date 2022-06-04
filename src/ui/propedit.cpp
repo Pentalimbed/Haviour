@@ -33,7 +33,8 @@ void PropEdit::setObject(std::string_view obj_id)
 {
     if (obj_id == m_edit_obj_id || !Hkx::HkxFileManager::getSingleton()->getCurrentFile()->getObj(obj_id))
         return;
-    m_edit_obj_id = obj_id;
+    m_edit_obj_id       = obj_id;
+    m_edit_obj_id_input = obj_id;
     m_history.push_front(m_edit_obj_id);
     if (m_history.size() > m_history_len)
         m_history.pop_back();

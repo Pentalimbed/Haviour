@@ -194,32 +194,8 @@ class HkxFileManager : public eventpp::EventDispatcher<HkxFileEventEnum, void()>
 public:
     static HkxFileManager* getSingleton();
 
-    inline void setCurrentFile(int idx)
-    {
-        m_current_file = &m_files[idx];
-        dispatch(kEventFileChanged);
-    }
-    inline void setCurrentFile(HkxFile::HkxFileType type)
-    {
-        switch (type)
-        {
-            case HkxFile::kBehaviour:
-                if (m_files.empty())
-                    m_current_file = nullptr;
-                else
-                    setCurrentFile(0);
-                break;
-            case HkxFile::kSkeleton:
-                m_current_file = &m_skel_file;
-                break;
-            case HkxFile::kCharacter:
-                m_current_file = &m_char_file;
-                break;
-            default: break;
-        }
-        if (type != HkxFile::kUnknown)
-            dispatch(kEventFileChanged);
-    }
+    void            setCurrentFile(int idx);
+    void            setCurrentFile(HkxFile::HkxFileType type);
     inline HkxFile* getCurrentFile() { return m_current_file; }
     inline bool     isCurrentFileReady() { return m_current_file && m_current_file->isFileLoaded(); }
 
@@ -235,7 +211,7 @@ public:
     void        saveFile(std::string_view path = {});
     inline void closeCurrentFile()
     {
-        if (m_current_file->getType() == HkxFile::kBehaviour)
+        if (m_current_file && m_current_file->getType() == HkxFile::kBehaviour)
         {
             auto idx = std::ranges::find_if(m_files, [=](auto& item) { return &item == m_current_file; }) - m_files.begin();
             m_files.erase(m_files.begin() + idx);

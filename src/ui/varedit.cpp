@@ -18,7 +18,7 @@ VarEdit* VarEdit::getSingleton()
 
 void VarEdit::show()
 {
-    if (ImGui::Begin("Variable/Event List", &m_show, ImGuiWindowFlags_NoScrollbar))
+    if (ImGui::Begin("Global List", &m_show, ImGuiWindowFlags_NoScrollbar))
     {
         auto file_manager = Hkx::HkxFileManager::getSingleton();
         if (file_manager->isCurrentFileReady())
@@ -429,7 +429,7 @@ void VarEdit::showCharPropList()
                 if (ImGui::Selectable(std::format("{}##{}", var.get<Hkx::PropName>().text().as_string(), var.m_index).c_str(), is_selected))
                 {
                     m_charprop_current = var;
-                    ImGui::OpenPopup("Editing Varibale");
+                    ImGui::OpenPopup("Editing Charprop");
                 }
                 addTooltip("Click to edit");
                 if (is_selected)
