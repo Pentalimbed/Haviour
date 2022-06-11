@@ -688,6 +688,13 @@ void CharacterFile::loadFile(std::string_view path)
     m_loaded = true;
 }
 
+void CharacterFile::saveFile(std::string_view path)
+{
+    m_prop_manager.reindex();
+
+    HkxFile::saveFile(path);
+}
+
 //////////////////////    FILE MANAGER
 HkxFileManager* HkxFileManager::getSingleton()
 {

@@ -76,6 +76,9 @@
 ### Bugfix
 - No opened file close file crash fix
 - Character file character property uneditable bug fix
+## 0.7.4a
+### Bugfix
+- Reindex when saving behaviour/character files
 
 Column view optimization
 Delete all children

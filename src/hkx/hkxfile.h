@@ -33,7 +33,7 @@ public:
     virtual constexpr HkxFileType getType() { return kUnknown; }
 
     void                    loadFile(std::string_view path);
-    void                    saveFile(std::string_view path = {});
+    virtual void            saveFile(std::string_view path = {});
     inline bool             isFileLoaded() { return m_loaded; }
     inline std::string_view getPath() { return m_path; }
 
@@ -110,8 +110,8 @@ class BehaviourFile : public HkxFile
 public:
     virtual constexpr HkxFileType getType() override { return kBehaviour; }
 
-    void loadFile(std::string_view path);
-    void saveFile(std::string_view path = {});
+    void         loadFile(std::string_view path);
+    virtual void saveFile(std::string_view path = {}) override;
 
     inline std::string_view getRootStateMachine()
     {
@@ -172,7 +172,8 @@ class CharacterFile : public HkxFile
 public:
     virtual constexpr HkxFileType getType() override { return kCharacter; }
 
-    void loadFile(std::string_view path);
+    void         loadFile(std::string_view path);
+    virtual void saveFile(std::string_view path = {}) override;
 
     inline virtual bool isObjEssential(std::string_view id) override
     {
